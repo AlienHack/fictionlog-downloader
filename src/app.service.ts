@@ -31,6 +31,10 @@ export class AppService {
     return (pad + num).slice(-pad.length);
   }
 
+  cleanTitle(title: string) {
+    return title.replace(':', '').replace('  ', ' ').replace('/', '-');
+  }
+
   async getBookDetail(bookId: string, token: string): Promise<any> {
     if (!token) return '';
     const query = getBookDetailQuery;
@@ -162,11 +166,6 @@ export class AppService {
       );
     }
 
-    // bookInfo._id
-    // bookInfo.coverImage
-    // bookInfo.description
-    // bookInfo.user.displayName
-    // bookInfo.title
     const bookInfo = await this.getBookDetail(bookId, token);
 
     const novelDirectory = path.join(downloadDirectory, bookInfo.title, '/');
@@ -183,42 +182,19 @@ export class AppService {
     const projectDirectory = path.join(novelDirectory, 'project/');
     await fs.promises.mkdir(projectDirectory, { recursive: true });
 
-    const bookPathEpub =
-      exportsDirectory +
-      bookInfo.title.replace(':', '').replace('  ', ' ').replace('/', '-') +
-      '.epub';
-
-    const projectFile =
-      projectDirectory +
-      bookInfo.title.replace(':', '').replace('  ', ' ').replace('/', '-') +
-      '.fictionlog';
-
-    const bookPathWord =
-      exportsDirectory +
-      bookInfo.title.replace(':', '').replace('  ', ' ').replace('/', '-') +
-      '.docx';
+    const bookPathEpub = `${exportsDirectory}${this.cleanTitle(bookInfo.title)}.epub`
+    const projectFile = `${projectDirectory}${this.cleanTitle(bookInfo.title)}.fictionlog`
+    const bookPathWord = `${exportsDirectory}${this.cleanTitle(bookInfo.title)}.docx`
 
     const chapters = [];
-    // chapter._id
-    // chapter.title
+
     for (const chapter of chaptersList) {
-      const chapterFile =
-        novelDirectory +
-        chapter.title.replace(':', '').replace('  ', ' ').replace('/', '-') +
-        '.txt';
+      const chapterFile = `${novelDirectory}${this.cleanTitle(chapter.title)}.txt`
 
       if (fs.existsSync(chapterFile)) {
-        // const chapterRaw = fs.readFileSync(chapterFile, 'utf8');
-        // chapters.push({
-        //   title: chapter.title.replace('  ', ' '),
-        //   data: chapterRaw,
-        // });
         continue;
       }
 
-      // chapterDetail._id
-      // chapterDetail.title
-      // chapterDetail.contentRawState.blocks[text, type]
       const chapterDetail = await this.getChapterDetail(chapter._id, token);
       const chapterBlocks = chapterDetail.contentRawState.blocks
         .map(({ text, type }) => ({

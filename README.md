@@ -7,8 +7,11 @@ A simple tool to download purchased novel from fictionlog
 
 ## Installation
 Install package using yarn
+
 `yarn`
+
 Run the tool
+
 `yarn start`
 
 ## How to use

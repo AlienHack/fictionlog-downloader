@@ -1,7 +1,7 @@
 # FictionLog Downloader
 A simple tool to download purchased novel from fictionlog
 
-## Prerequisit
+## Prerequisite
 - NodeJS 14.x
 - Nest CLI
 
@@ -12,7 +12,8 @@ Run the tool
 `yarn start`
 
 ## How to use
-1. Get your accessToken from browser's inspect using right click -> inspect
+0. Browse to `https://fictionlog.co`
+1. Get your accessToken from browser's inspect function by right click -> inspect
 2. Navigate to Application tab -> Cookies -> fictionlog.co
 3. Copy your accessToken value
 4. Open rename .env.example -> .env

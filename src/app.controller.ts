@@ -1,5 +1,7 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Res } from '@nestjs/common';
+import { Controller, Get, Param, Query } from '@nestjs/common';
 import { AppService } from './app.service';
+import { Response } from 'express';
 
 @Controller()
 export class AppController {
@@ -51,8 +53,19 @@ export class AppController {
 
   //APPS
   @Get('downloadBook/:bookId')
-  async downloadBook(@Param('bookId') bookId: string) {
-    const token = process.env.TOKEN;
-    return await this.appService.downloadBook(bookId, token);
+  async downloadBook(
+    @Param('bookId') bookId: string,
+    @Query('token') token: string,
+    @Query('bookType') bookType: string,
+    @Res() res: Response,
+  ) {
+    token = token || process.env.TOKEN;
+    bookType = bookType || 'epub';
+    const bookData = await this.appService.downloadBook(
+      bookId,
+      token,
+      bookType,
+    );
+    return res.download(bookData.bookPath, bookData.bookName);
   }
 }

@@ -335,6 +335,14 @@ export class AppService {
         new docx.Paragraph({
           text: chapter.title,
           heading: HeadingLevel.HEADING_1,
+          border: {
+            bottom: {
+              color: 'auto',
+              space: 1,
+              value: 'single',
+              size: 6,
+            },
+          },
         }),
       );
       for (const paragraph of chapter.blocks) {
@@ -342,11 +350,12 @@ export class AppService {
           new docx.Paragraph({
             children: [
               new docx.TextRun({
-                text: '       ' + paragraph.text.trim(),
-                size: 50,
+                text: '\t' + paragraph.text.trim(),
+                size: 40,
+                font: 'Angsana New',
               }),
             ],
-            alignment: AlignmentType.JUSTIFIED,
+            alignment: 'thaiDistribute' as AlignmentType,
           }),
         );
       }
@@ -373,11 +382,14 @@ export class AppService {
             run: {
               size: 70,
               bold: true,
+              font: 'Angsana New',
+              color: '#00D2FF',
             },
             paragraph: {
               spacing: {
                 after: 120,
               },
+              alignment: AlignmentType.CENTER,
             },
           },
         ],

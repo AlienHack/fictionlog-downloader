@@ -32,7 +32,12 @@ export class AppService {
   }
 
   cleanTitle(title: string) {
-    return title.replace(':', '').replace('  ', ' ').replace('/', '-');
+    return title
+      .replace(':', '')
+      .replace('  ', ' ')
+      .replace('/', '-')
+      .replace('?', '')
+      .trim();
   }
 
   async getfileStream(path: string) {
@@ -209,6 +214,9 @@ export class AppService {
     const projectDirectory = path.join(novelDirectory, 'project/');
     await fs.promises.mkdir(projectDirectory, { recursive: true });
 
+    const rawDirectory = path.join(novelDirectory, 'raw/');
+    await fs.promises.mkdir(rawDirectory, { recursive: true });
+
     const bookPathEpub = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.epub`;
@@ -225,8 +233,11 @@ export class AppService {
       const chapterFile = `${novelDirectory}${this.cleanTitle(
         chapter.title,
       )}.txt`;
+      const rawFile = `${rawDirectory}${this.cleanTitle(chapter.title)}.txt`;
 
       if (fs.existsSync(chapterFile)) {
+        const chapter = fs.readFileSync(rawFile, 'utf8');
+        chapters.push(JSON.parse(chapter));
         continue;
       }
 
@@ -239,18 +250,19 @@ export class AppService {
         .filter(({ text }) => text.length >= 2);
       let chapterRaw = '';
       for (const block of chapterBlocks) {
-        chapterRaw += `<p>${block.text}</p>`;
+        chapterRaw += `<p>${block.text.trim()}</p>`;
       }
 
-      fs.writeFile(chapterFile, chapterRaw, function (err) {
-        if (err) console.log(err);
-      });
-
-      chapters.push({
+      const chapterData = {
         title: chapterDetail.title,
         data: chapterRaw,
         blocks: chapterBlocks,
-      });
+      };
+
+      fs.writeFileSync(chapterFile, chapterRaw);
+      fs.writeFileSync(rawFile, JSON.stringify(chapterData));
+
+      chapters.push(chapterData);
     }
 
     let book: {
@@ -330,7 +342,7 @@ export class AppService {
           new docx.Paragraph({
             children: [
               new docx.TextRun({
-                text: '         ' + paragraph.text,
+                text: '       ' + paragraph.text.trim(),
                 size: 50,
               }),
             ],

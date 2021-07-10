@@ -1,5 +1,13 @@
 /* This is all just to start and stop the animation. Technically, the animation itself only uses CSS. */
 
+document.getElementById('accessTokenHelper').addEventListener('click',function(){
+  window.open('https://streamable.com/jnvmpm')
+}, false)
+
+document.getElementById('bookIdHelper').addEventListener('click',function(){
+  window.open('https://streamable.com/swsjzu')
+}, false)
+
 document.querySelector('button').addEventListener(
   'click',
   function () {

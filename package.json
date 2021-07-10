@@ -8,6 +8,8 @@
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",
+    "build:dev": "nest build && pm2 start pm2.yaml",
+    "build:prod": "nest build && pm2 start pm2.yaml -n fictionlog-downloader --env production",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",

@@ -3,14 +3,9 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Response } from 'express';
 
-@Controller()
+@Controller('api')
 export class AppController {
   constructor(private readonly appService: AppService) {}
-
-  @Get()
-  welcome(): string {
-    return this.appService.welcome();
-  }
 
   //RAW API
   @Get('getBookDetail/:bookId/:token')

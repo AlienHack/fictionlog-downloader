@@ -223,12 +223,18 @@ export class AppService {
     const rawDirectory = path.join(novelDirectory, 'raw/');
     await fs.promises.mkdir(rawDirectory, { recursive: true });
 
+    const projectDirectory = path.join(novelDirectory, 'project/');
+    await fs.promises.mkdir(projectDirectory, { recursive: true });
+
     const bookPathEpub = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.epub`;
     const bookPathWord = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.docx`;
+    const bookProject = `${projectDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.fictionlog`;
 
     const chapters = [];
 
@@ -291,6 +297,10 @@ export class AppService {
     } else {
       await this.generateEpub(book);
     }
+
+    fs.writeFile(bookProject, JSON.stringify(book), function () {
+      return;
+    });
 
     return {
       success: true,

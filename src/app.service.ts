@@ -342,8 +342,8 @@ export class AppService {
           new docx.Paragraph({
             children: [
               new docx.TextRun({
-                text: '       ' + paragraph.text.trim(),
-                size: 50,
+                text: '\t' + paragraph.text.trim(),
+                size: 40,
               }),
             ],
             alignment: AlignmentType.JUSTIFIED,

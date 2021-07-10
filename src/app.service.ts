@@ -33,10 +33,12 @@ export class AppService {
 
   cleanTitle(title: string) {
     return title
-      .replace(':', '')
-      .replace('  ', ' ')
-      .replace('/', '-')
-      .replace('?', '')
+      .replace(/\:/g, '-')
+      .replace(/:/g, '-')
+      .replace(/  /g, ' ')
+      .replace(/\//g, '-')
+      .replace(/\\/g, '-')
+      .replace(/\?/g, '')
       .trim();
   }
 

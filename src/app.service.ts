@@ -35,6 +35,11 @@ export class AppService {
     return title.replace(':', '').replace('  ', ' ').replace('/', '-');
   }
 
+  async getfileStream(path: string) {
+    const fileStream = fs.createReadStream(path);
+    return fileStream;
+  }
+
   async getBookDetail(bookId: string, token: string): Promise<any> {
     if (!token) return '';
     const query = getBookDetailQuery;
@@ -152,9 +157,15 @@ export class AppService {
     return availableChapters;
   }
 
-  async downloadBook(bookId: string, token: string): Promise<any> {
-    if (!token) throw new Error('token is required');
-    if (!bookId) throw new Error('bookId is required');
+  async downloadBook(
+    bookId: string,
+    token: string,
+    bookType: string,
+  ): Promise<any> {
+    if (!token)
+      throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
+    if (!bookId)
+      throw new HttpException('bookId is required', HttpStatus.BAD_REQUEST);
     const downloadDirectory = path.join(__dirname, '../../downloads/');
     await fs.promises.mkdir(downloadDirectory, { recursive: true });
 
@@ -255,17 +266,16 @@ export class AppService {
     }
 
     book.chapters = _.unionBy(book.chapters, chapters, 'title');
-    fs.writeFile(projectFile, JSON.stringify(book), function (err) {
-      if (err) console.log(err);
-    });
+    fs.writeFileSync(projectFile, JSON.stringify(book));
 
     await this.generateEpub(book);
     await this.generateWord(book);
+
     return {
       success: true,
       detail: `The epub/docx has been downloaded and generated`,
-      epub: bookPathEpub,
-      docx: bookPathWord,
+      bookPath: `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
+      bookName: `${bookInfo.title}.${bookType === 'docx' ? 'docx' : 'epub'}`,
     };
   }
 
@@ -277,7 +287,7 @@ export class AppService {
       cover: bookInfo.coverImage,
       content: bookInfo.chapters,
     };
-    new epub(option, bookInfo.bookPathEpub);
+    await new epub(option, bookInfo.bookPathEpub).promise;
   }
 
   async generateWord(bookInfo): Promise<any> {
@@ -346,8 +356,7 @@ export class AppService {
       },
       sections: sections,
     });
-    docx.Packer.toBuffer(doc).then((buffer) => {
-      fs.writeFileSync(bookInfo.bookPathWord, buffer);
-    });
+    const buffer = await docx.Packer.toBuffer(doc);
+    fs.writeFileSync(bookInfo.bookPathWord, buffer);
   }
 }

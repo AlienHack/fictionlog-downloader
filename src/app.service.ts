@@ -32,7 +32,11 @@ export class AppService {
   }
 
   cleanTitle(title: string) {
-    return title.replace(':', '').replace('  ', ' ').replace('/', '-');
+    return title
+      .replace(':', '')
+      .replace('  ', ' ')
+      .replace('/', '-')
+      .replace('?', '');
   }
 
   async getfileStream(path: string) {

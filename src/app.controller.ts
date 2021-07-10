@@ -64,6 +64,15 @@ export class AppController {
     return res.download(bookData.bookPath, bookData.bookName);
   }
 
+  @Get('purchaseBook/:bookId')
+  async purchaseBook(
+    @Param('bookId') bookId: string,
+    @Query('token') token: string,
+  ) {
+    token = token || process.env.TOKEN;
+    return this.appService.purchaseAllChapters(bookId, token);
+  }
+
   @Get('generateEbooks')
   async generateEbooks() {
     return await this.appService.generateEbooks();

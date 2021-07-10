@@ -263,6 +263,9 @@ export class AppService {
     const bookProject = `${projectDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.fictionlog`;
+    const bookMetaProject = `${projectDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.meta`;
 
     const chapters = [];
 
@@ -326,9 +329,29 @@ export class AppService {
       await this.generateEpub(book);
     }
 
-    fs.writeFile(bookProject, JSON.stringify(book), function () {
-      return;
-    });
+    const sessionMeta = {
+      totalChapters: chapters.length,
+      bookId: bookId,
+      token: token,
+      title: bookInfo.title,
+      coverImage: bookInfo.coverImage,
+      description: bookInfo.description,
+      hashtags: bookInfo.hashtags,
+      author: bookInfo.authorName || bookInfo.user.displayName,
+      translator: bookInfo.translatorName || bookInfo.user.displayName,
+    };
+
+    if (!fs.existsSync(bookMetaProject)) {
+      fs.writeFileSync(bookProject, JSON.stringify(book));
+      fs.writeFileSync(bookMetaProject, JSON.stringify(sessionMeta));
+    }
+
+    const previousMeta = JSON.parse(fs.readFileSync(bookMetaProject, 'utf8'));
+
+    if (sessionMeta.totalChapters > previousMeta.totalChapters) {
+      fs.writeFileSync(bookProject, JSON.stringify(book));
+      fs.writeFileSync(bookMetaProject, JSON.stringify(sessionMeta));
+    }
 
     return {
       success: true,

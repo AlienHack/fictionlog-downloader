@@ -18,9 +18,11 @@ import {
   requestUrl,
 } from './schemas/fictionlog-schema';
 import { AlignmentType, HeadingLevel } from 'docx';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
+  private readonly logger: Logger = new Logger('fiction-log-service');
   welcome(): string {
     return `Welcome to FictionLog Downloader v.${version}`;
   }
@@ -218,18 +220,12 @@ export class AppService {
     const exportsDirectory = path.join(novelDirectory, 'exports/');
     await fs.promises.mkdir(exportsDirectory, { recursive: true });
 
-    const projectDirectory = path.join(novelDirectory, 'project/');
-    await fs.promises.mkdir(projectDirectory, { recursive: true });
-
     const rawDirectory = path.join(novelDirectory, 'raw/');
     await fs.promises.mkdir(rawDirectory, { recursive: true });
 
     const bookPathEpub = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.epub`;
-    const projectFile = `${projectDirectory}${this.cleanTitle(
-      bookInfo.title,
-    )}.fictionlog`;
     const bookPathWord = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.docx`;
@@ -272,45 +268,35 @@ export class AppService {
       chapters.push(chapterData);
     }
 
-    let book: {
-      chapters: any;
-      title?: any;
-      coverImage?: any;
-      description?: any;
-      hashtags?: any;
-      author?: any;
-      translator?: any;
-      bookPathEpub?: string;
-      bookPathWord?: string;
+    const book = {
+      title: bookInfo.title,
+      coverImage: bookInfo.coverImage,
+      description: bookInfo.description,
+      hashtags: bookInfo.hashtags,
+      author: bookInfo.authorName || bookInfo.user.displayName,
+      translator: bookInfo.translatorName || bookInfo.user.displayName,
+      chapters: chapters,
+      bookPathEpub: bookPathEpub,
+      bookPathWord: bookPathWord,
     };
 
-    if (fs.existsSync(projectFile)) {
-      book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+    const bookName = `${bookInfo.title}.${
+      bookType === 'docx' ? 'docx' : 'epub'
+    }`;
+
+    this.logger.verbose(`Generating ${bookName}`);
+
+    if (bookType === 'docx') {
+      await this.generateWord(book);
     } else {
-      book = {
-        title: bookInfo.title,
-        coverImage: bookInfo.coverImage,
-        description: bookInfo.description,
-        hashtags: bookInfo.hashtags,
-        author: bookInfo.authorName || bookInfo.user.displayName,
-        translator: bookInfo.translatorName || bookInfo.user.displayName,
-        chapters: chapters,
-        bookPathEpub: bookPathEpub,
-        bookPathWord: bookPathWord,
-      };
+      await this.generateEpub(book);
     }
-
-    book.chapters = _.unionBy(book.chapters, chapters, 'title');
-    fs.writeFileSync(projectFile, JSON.stringify(book));
-
-    await this.generateEpub(book);
-    await this.generateWord(book);
 
     return {
       success: true,
       detail: `The epub/docx has been downloaded and generated`,
       bookPath: `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
-      bookName: `${bookInfo.title}.${bookType === 'docx' ? 'docx' : 'epub'}`,
+      bookName: bookName,
     };
   }
 
@@ -321,6 +307,7 @@ export class AppService {
       publisher: bookInfo.author,
       cover: bookInfo.coverImage,
       content: bookInfo.chapters,
+      verbose: false,
     };
     await new epub(option, bookInfo.bookPathEpub).promise;
   }

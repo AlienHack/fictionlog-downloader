@@ -18,9 +18,11 @@ import {
   requestUrl,
 } from './schemas/fictionlog-schema';
 import { AlignmentType, HeadingLevel } from 'docx';
+import { Logger } from '@nestjs/common';
 
 @Injectable()
 export class AppService {
+  private readonly logger: Logger = new Logger('fiction-log-service');
   welcome(): string {
     return `Welcome to FictionLog Downloader v.${version}`;
   }
@@ -278,6 +280,12 @@ export class AppService {
       bookPathWord: bookPathWord,
     };
 
+    const bookName = `${bookInfo.title}.${
+      bookType === 'docx' ? 'docx' : 'epub'
+    }`;
+
+    this.logger.verbose(`Generating ${bookName}`);
+
     if (bookType === 'docx') {
       await this.generateWord(book);
     } else {
@@ -288,7 +296,7 @@ export class AppService {
       success: true,
       detail: `The epub/docx has been downloaded and generated`,
       bookPath: `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
-      bookName: `${bookInfo.title}.${bookType === 'docx' ? 'docx' : 'epub'}`,
+      bookName: bookName,
     };
   }
 
@@ -299,6 +307,7 @@ export class AppService {
       publisher: bookInfo.author,
       cover: bookInfo.coverImage,
       content: bookInfo.chapters,
+      verbose: false,
     };
     await new epub(option, bookInfo.bookPathEpub).promise;
   }

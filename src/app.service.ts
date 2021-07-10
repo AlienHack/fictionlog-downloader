@@ -343,10 +343,11 @@ export class AppService {
             children: [
               new docx.TextRun({
                 text: '\t' + paragraph.text.trim(),
-                size: 40,
+                size: 50,
+                font: 'Angsana New',
               }),
             ],
-            alignment: AlignmentType.JUSTIFIED,
+            alignment: 'thaiDistribute' as AlignmentType,
           }),
         );
       }
@@ -373,6 +374,7 @@ export class AppService {
             run: {
               size: 70,
               bold: true,
+              font: 'Angsana New',
             },
             paragraph: {
               spacing: {

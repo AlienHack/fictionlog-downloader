@@ -203,7 +203,11 @@ export class AppService {
 
     const bookInfo = await this.getBookDetail(bookId, token);
 
-    const novelDirectory = path.join(downloadDirectory, bookInfo.title, '/');
+    const novelDirectory = path.join(
+      downloadDirectory,
+      this.cleanTitle(bookInfo.title),
+      '/',
+    );
     await fs.promises.mkdir(novelDirectory, { recursive: true });
 
     const chaptersList = await this.getAvailableChapterToDownload(

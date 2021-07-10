@@ -342,7 +342,7 @@ export class AppService {
           new docx.Paragraph({
             children: [
               new docx.TextRun({
-                text: '         ' + paragraph.text,
+                text: '       ' + paragraph.text.trim(),
                 size: 50,
               }),
             ],

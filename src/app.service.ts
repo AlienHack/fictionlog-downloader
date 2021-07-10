@@ -218,18 +218,12 @@ export class AppService {
     const exportsDirectory = path.join(novelDirectory, 'exports/');
     await fs.promises.mkdir(exportsDirectory, { recursive: true });
 
-    const projectDirectory = path.join(novelDirectory, 'project/');
-    await fs.promises.mkdir(projectDirectory, { recursive: true });
-
     const rawDirectory = path.join(novelDirectory, 'raw/');
     await fs.promises.mkdir(rawDirectory, { recursive: true });
 
     const bookPathEpub = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.epub`;
-    const projectFile = `${projectDirectory}${this.cleanTitle(
-      bookInfo.title,
-    )}.fictionlog`;
     const bookPathWord = `${exportsDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.docx`;
@@ -272,39 +266,23 @@ export class AppService {
       chapters.push(chapterData);
     }
 
-    let book: {
-      chapters: any;
-      title?: any;
-      coverImage?: any;
-      description?: any;
-      hashtags?: any;
-      author?: any;
-      translator?: any;
-      bookPathEpub?: string;
-      bookPathWord?: string;
+    const book = {
+      title: bookInfo.title,
+      coverImage: bookInfo.coverImage,
+      description: bookInfo.description,
+      hashtags: bookInfo.hashtags,
+      author: bookInfo.authorName || bookInfo.user.displayName,
+      translator: bookInfo.translatorName || bookInfo.user.displayName,
+      chapters: chapters,
+      bookPathEpub: bookPathEpub,
+      bookPathWord: bookPathWord,
     };
 
-    if (fs.existsSync(projectFile)) {
-      book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+    if (bookType === 'docx') {
+      await this.generateWord(book);
     } else {
-      book = {
-        title: bookInfo.title,
-        coverImage: bookInfo.coverImage,
-        description: bookInfo.description,
-        hashtags: bookInfo.hashtags,
-        author: bookInfo.authorName || bookInfo.user.displayName,
-        translator: bookInfo.translatorName || bookInfo.user.displayName,
-        chapters: chapters,
-        bookPathEpub: bookPathEpub,
-        bookPathWord: bookPathWord,
-      };
+      await this.generateEpub(book);
     }
-
-    book.chapters = _.unionBy(book.chapters, chapters, 'title');
-    fs.writeFileSync(projectFile, JSON.stringify(book));
-
-    await this.generateEpub(book);
-    await this.generateWord(book);
 
     return {
       success: true,

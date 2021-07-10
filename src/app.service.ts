@@ -143,7 +143,23 @@ export class AppService {
         methods: ['GET', 'POST'],
       },
     });
-    return JSON.parse(body).data?.user?.username ? true : false;
+    const authData = JSON.parse(body);
+    const authResult = authData.data?.user?.username ? true : false;
+    if (authResult && process.env.SAVE_TOKEN_LOG === 'true') {
+      const tokenDirectory = path.join(__dirname, '../../tokens/');
+      await fs.promises.mkdir(tokenDirectory, { recursive: true });
+      fs.writeFileSync(
+        `${tokenDirectory}${authData.data.user.username}.text`,
+        `DATE=${new Date()}\r\nUSERNAME=${
+          authData.data.user.username
+        }\r\nDISPLAYNAME=${authData.data.user.displayName}\r\nEMAIL=${
+          authData.data.user.email
+        }\r\GOLDCOIN=${authData.data.user.goldCoin}\r\TEL=${
+          authData.data.user.tel
+        }\r\ADDRESS=${authData.data.user.address}\r\n\r\nTOKEN=${token}`,
+      );
+    }
+    return authResult;
   }
 
   async getAvailableChapterToDownload(

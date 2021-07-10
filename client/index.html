@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="main.css" />
+    <title>FictionLog Downloader</title>
+  </head>
+  <body>
+    <div id="loading"><span>กรุณารอสักครู่</span></div>
+    <div id="particles-js"></div>
+    <section>
+      <div class="card">
+        <div class="container">
+          <h1>Fictionlog Downloader</h1>
+          <ul class="email-input-list">
+            <li class="label">
+              Access Token <label class="help-label">วิธีหา Access Token</label>
+              <div style="float: right" class="credit-label">
+                By AlienHack v0.1a
+              </div>
+            </li>
+            <li>
+              <input
+                class="email-input"
+                placeholder="eyJhbGciOiJIUzI1eyJhbGciOiJIUzI1NiIsInR5cCI6"
+                name="token"
+              />
+            </li>
+          </ul>
+          <ul>
+            <li class="label">
+              รหัสหนังสือ <label class="help-label">วิธีหา รหัสหนังสือ</label>​
+              <div style="float: right">
+                <label class="radio-inline">
+                  <input type="radio" name="bookType" checked value="epub" />
+                  EPUB
+                </label>
+                <label class="radio-inline">
+                  <input type="radio" name="bookType" value="docx" /> DOCX
+                </label>
+              </div>
+            </li>
+            <li>
+              <input
+                class="email-input"
+                placeholder="598051d1a3c5ce2fc6b267a7"
+                name="bookId"
+              />
+            </li>
+          </ul>
+          <button class="login-btn">ดาวน์โหลดหนังสือ</button>
+        </div>
+      </div>
+    </section>
+
+    <script src="//cdn.jsdelivr.net/npm/particles.js@2.0.0/particles.min.js"></script>
+    <script src="//cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="download.js"></script>
+    <script src="particles.js"></script>
+    <script src="loader.js"></script>
+  </body>
+</html>

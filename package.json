@@ -4,7 +4,7 @@
   "description": "A simple tool to download purchased novel from fictionlog",
   "author": "AlienHack",
   "private": true,
-  "license": "UNLICENSED",
+  "license": "MIT",
   "scripts": {
     "prebuild": "rimraf dist",
     "build": "nest build",

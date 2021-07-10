@@ -335,6 +335,14 @@ export class AppService {
         new docx.Paragraph({
           text: chapter.title,
           heading: HeadingLevel.HEADING_1,
+          border: {
+            bottom: {
+              color: 'auto',
+              space: 1,
+              value: 'single',
+              size: 6,
+            },
+          },
         }),
       );
       for (const paragraph of chapter.blocks) {
@@ -343,7 +351,7 @@ export class AppService {
             children: [
               new docx.TextRun({
                 text: '\t' + paragraph.text.trim(),
-                size: 50,
+                size: 40,
                 font: 'Angsana New',
               }),
             ],
@@ -375,11 +383,13 @@ export class AppService {
               size: 70,
               bold: true,
               font: 'Angsana New',
+              color: '#00D2FF',
             },
             paragraph: {
               spacing: {
                 after: 120,
               },
+              alignment: AlignmentType.CENTER,
             },
           },
         ],

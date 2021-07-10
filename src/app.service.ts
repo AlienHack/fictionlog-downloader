@@ -17,7 +17,7 @@ import {
   getUserDetailVariable,
   requestUrl,
 } from './schemas/fictionlog-schema';
-import { AlignmentType, HeadingLevel, UnderlineType } from 'docx';
+import { AlignmentType, HeadingLevel } from 'docx';
 
 @Injectable()
 export class AppService {
@@ -182,14 +182,22 @@ export class AppService {
     const projectDirectory = path.join(novelDirectory, 'project/');
     await fs.promises.mkdir(projectDirectory, { recursive: true });
 
-    const bookPathEpub = `${exportsDirectory}${this.cleanTitle(bookInfo.title)}.epub`
-    const projectFile = `${projectDirectory}${this.cleanTitle(bookInfo.title)}.fictionlog`
-    const bookPathWord = `${exportsDirectory}${this.cleanTitle(bookInfo.title)}.docx`
+    const bookPathEpub = `${exportsDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.epub`;
+    const projectFile = `${projectDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.fictionlog`;
+    const bookPathWord = `${exportsDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.docx`;
 
     const chapters = [];
 
     for (const chapter of chaptersList) {
-      const chapterFile = `${novelDirectory}${this.cleanTitle(chapter.title)}.txt`
+      const chapterFile = `${novelDirectory}${this.cleanTitle(
+        chapter.title,
+      )}.txt`;
 
       if (fs.existsSync(chapterFile)) {
         continue;

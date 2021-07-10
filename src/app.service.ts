@@ -45,6 +45,34 @@ export class AppService {
       .trim();
   }
 
+  getDirectories(srcPath) {
+    return fs
+      .readdirSync(srcPath)
+      .map((file) => path.join(srcPath, file))
+      .filter((path) => fs.statSync(path).isDirectory());
+  }
+
+  async generateEbooks() {
+    const downloadDirectory = path.join(__dirname, '../../downloads/');
+    const novelDirectories = this.getDirectories(downloadDirectory);
+
+    for (const novelDirectory of novelDirectories) {
+      try {
+        const projectDirectory = path.join(novelDirectory, '/project/');
+        const projectFile = path.join(
+          projectDirectory,
+          fs.readdirSync(projectDirectory)[0],
+        );
+        const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+        await this.generateEpub(book);
+        await this.generateWord(book);
+      } catch (err) {
+        this.logger.error(err);
+      }
+    }
+    return { status: 'success' };
+  }
+
   async getfileStream(path: string) {
     const fileStream = fs.createReadStream(path);
     return fileStream;

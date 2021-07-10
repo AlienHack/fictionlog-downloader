@@ -39,6 +39,7 @@ export class AppService {
       .replace(/\//g, '-')
       .replace(/\\/g, '-')
       .replace(/\?/g, '')
+      .replace(/\!/g, '')
       .trim();
   }
 

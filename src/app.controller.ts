@@ -63,4 +63,9 @@ export class AppController {
     );
     return res.download(bookData.bookPath, bookData.bookName);
   }
+
+  @Get('generateEbooks')
+  async generateEbooks() {
+    return await this.appService.generateEbooks();
+  }
 }

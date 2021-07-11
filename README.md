@@ -1,4 +1,6 @@
-# FictionLog Downloader v0.3
+![Fictionlog Downloader]([/assets/images/tux.png](https://i.imgur.com/Y5I4uvE.png))
+
+# FictionLog Downloader
 A simple tool to download purchased novel from fictionlog
 
 ## Prerequisite

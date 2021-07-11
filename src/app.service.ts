@@ -249,7 +249,7 @@ export class AppService {
     const allChaptersList = await this.getChapterList(bookId, token);
 
     const chaptersList = allChaptersList.filter(
-      (chapter) => !chapter.isPurchaseRequired,
+      (chapter) => chapter.isPurchaseRequired,
     );
 
     for (const chapter of chaptersList) {

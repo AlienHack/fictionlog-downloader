@@ -43,7 +43,7 @@ export class AppService {
       .replace(/\//g, '-')
       .replace(/\\/g, '-')
       .replace(/\?/g, '')
-      .replace(/[^\u0E00-\u0E7Fa-zA-Z 0-9()\[\]\!]/g, '')
+      .replace(/[^\u0E00-\u0E7Fa-zA-Z 0-9()\[\]\!\.\+\-]/g, '')
       .trim();
   }
 

@@ -1,7 +1,10 @@
-![Fictionlog Downloader]([/assets/images/tux.png](https://i.imgur.com/Y5I4uvE.png))
+![Fictionlog Downloader](https://i.imgur.com/Y5I4uvE.png)
 
 # FictionLog Downloader
 A simple tool to download purchased novel from fictionlog
+
+## Demo
+[https://fictionlog.nanobit.dev](https://fictionlog.nanobit.dev)
 
 ## Prerequisite
 - NodeJS 14.x

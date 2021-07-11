@@ -74,8 +74,8 @@ document.querySelector('button').addEventListener(
       bookType;
 
     fetch(downloadUrl).then((response) => {
+      stopAnim();
       if (!response.ok) {
-        stopAnim();
         if (response.status == 403) {
           Swal.fire({
             title: 'มีข้อผิดพลาด',
@@ -83,7 +83,6 @@ document.querySelector('button').addEventListener(
             icon: 'error',
             confirmButtonText: 'ตกลง',
           });
-          return;
         } else if (response.status == 400 || response.status == 404) {
           Swal.fire({
             title: 'มีข้อผิดพลาด',
@@ -91,12 +90,18 @@ document.querySelector('button').addEventListener(
             icon: 'error',
             confirmButtonText: 'ตกลง',
           });
-          return;
+        } else if (response.status != 200) {
+          Swal.fire({
+            title: 'มีข้อผิดพลาด',
+            text: 'ข้อผิดพลาดจากเซิฟเวอร์ กรุณาลองใหม่อีกครั้ง',
+            icon: 'error',
+            confirmButtonText: 'ตกลง',
+          });
         }
+        return;
       }
       response.blob().then((blob) => {
         download(blob);
-        stopAnim();
       });
     });
   },

@@ -366,3 +366,110 @@ fragment currentUser on User {
   `;
 
 export const getUserDetailVariable = {};
+
+export const purchaseChapter = `mutation PurchaseChapterInChapterDetail($chapterId: ID!, $input: PurchaseInput!) {
+  purchaseChapter(chapterId: $chapterId, input: $input) {
+    _id
+    title
+    contentRawState
+    isWriter
+    status
+    publishedAt
+    isPurchaseRequired
+    priceId
+    userId
+    viewsCount
+    chapterCommentsCount
+    chapterNumber
+    note
+    price {
+      type
+      goldCoin
+      __typename
+    }
+    user {
+      _id
+      displayName
+      username
+      profileImage
+      __typename
+    }
+    nextChapter {
+      _id
+      title
+      status
+      purchased
+      bookId
+      price {
+        type
+        goldCoin
+        __typename
+      }
+      __typename
+    }
+    editChapter {
+      _id
+      title
+      contentRawState
+      status
+      rejectNote
+      __typename
+    }
+    book {
+      ...BookInChapterDetail
+      __typename
+    }
+    __typename
+  }
+}
+
+fragment BookInChapterDetail on Book {
+  _id
+  title
+  description
+  coverImage
+  addedToLibrary
+  hasPaidChapter
+  bundlePurchased
+  contentType
+  completed
+  placeholderBackgroundColor
+  activatedAt
+  enableSupport
+  productSet {
+    _id
+    __typename
+  }
+  chaptersCount {
+    public
+    __typename
+  }
+  user {
+    _id
+    __typename
+  }
+  categories {
+    _id
+    name
+    slug
+    __typename
+  }
+  bundlePrice {
+    goldCoin
+    __typename
+  }
+  totalPrice {
+    goldCoin
+    __typename
+  }
+  __typename
+}
+`;
+
+export const purchaseChaptersVariable = {
+  chapterId: '',
+  input: {
+    coinType: 'goldCoin',
+    amount: 300,
+  },
+};

@@ -15,6 +15,8 @@ import {
   getChapterListVariable,
   getUserDetailQuery,
   getUserDetailVariable,
+  purchaseChapter,
+  purchaseChaptersVariable,
   requestUrl,
 } from './schemas/fictionlog-schema';
 import { AlignmentType, HeadingLevel } from 'docx';
@@ -41,7 +43,7 @@ export class AppService {
       .replace(/\//g, '-')
       .replace(/\\/g, '-')
       .replace(/\?/g, '')
-      .replace(/\!/g, '')
+      .replace(/[^\u0E00-\u0E7Fa-zA-Z 0-9()\[\]\!\.\+\-]/g, '')
       .trim();
   }
 
@@ -209,6 +211,74 @@ export class AppService {
       (chapter) => !chapter.isPurchaseRequired,
     );
     return availableChapters;
+  }
+
+  async getAvailableChapterToPurchase(
+    bookId: string,
+    token: string,
+  ): Promise<any> {
+    if (!token) return '';
+    const availableChapters = (await this.getChapterList(bookId, token)).filter(
+      (chapter) => chapter.isPurchaseRequired,
+    );
+    return availableChapters;
+  }
+
+  async purchaseAllChapters(bookId: string, token: string) {
+    if (!token)
+      throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
+    if (!bookId)
+      throw new HttpException('bookId is required', HttpStatus.BAD_REQUEST);
+    const isAuthenticated = await this.isAuthenticated(token);
+    if (!isAuthenticated) {
+      throw new HttpException(
+        'User is not authenticated',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const bookInfo = await this.getBookDetail(bookId, token);
+
+    const chaptersList = await this.getAvailableChapterToPurchase(
+      bookId,
+      token,
+    );
+
+    for (const chapter of chaptersList) {
+      const chapterId = chapter._id;
+      const price = +chapter.price.goldCoin;
+
+      const query = purchaseChapter;
+      const variables = purchaseChaptersVariable;
+      variables.chapterId = chapterId;
+      variables.input.amount = +price;
+
+      const { body } = await got.post(requestUrl, {
+        body: JSON.stringify({
+          query: query,
+          variables: variables,
+        }),
+        headers: {
+          authorization: `JWT ${token}`,
+          'Content-Type': 'application/json',
+        },
+        retry: {
+          limit: 3,
+          methods: ['GET', 'POST'],
+        },
+      });
+      const result = JSON.parse(body);
+      if (!result.data) {
+        this.logger.error(
+          `Purchased ${chapter.title} from book ${bookInfo.title} failed!`,
+        );
+        break;
+      }
+      this.logger.verbose(
+        `Purchased ${chapter.title} from book ${bookInfo.title} successfully!`,
+      );
+    }
+    return { status: 'success' };
   }
 
   async downloadBook(

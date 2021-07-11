@@ -4,7 +4,6 @@
   <img height="400" src="https://i.imgur.com/Y5I4uvE.png">
 </p>
 
-# FictionLog Downloader
 A simple tool to download purchased novel from fictionlog
 
 ## Demo

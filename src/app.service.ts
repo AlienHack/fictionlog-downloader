@@ -38,12 +38,11 @@ export class AppService {
   cleanTitle(title: string) {
     return title
       .replace(/\:/g, '-')
-      .replace(/:/g, '-')
       .replace(/  /g, ' ')
       .replace(/\//g, '-')
       .replace(/\\/g, '-')
       .replace(/\?/g, '')
-      .replace(/[^\u0E00-\u0E7Fa-zA-Z 0-9()\[\]\!\.\+\-]/g, '')
+      .replace(/[^\u0E00-\u0E7Fa-zA-Z 0-9()\[\]\!\+\-]/g, '')
       .trim();
   }
 
@@ -162,7 +161,14 @@ export class AppService {
         'No chapterList found or invalid authentication code',
         HttpStatus.NOT_FOUND,
       );
-    return chapterList.data.chapterList.chapters;
+
+    const chaptersResult = chapterList.data.chapterList.chapters;
+    let i = 1;
+
+    chaptersResult.forEach(function (chapter) {
+      chapter.order = i++;
+    });
+    return chaptersResult;
   }
 
   async isAuthenticated(token: string): Promise<any> {
@@ -239,9 +245,10 @@ export class AppService {
 
     const bookInfo = await this.getBookDetail(bookId, token);
 
-    const chaptersList = await this.getAvailableChapterToPurchase(
-      bookId,
-      token,
+    const allChaptersList = await this.getChapterList(bookId, token);
+
+    const chaptersList = allChaptersList.filter(
+      (chapter) => chapter.isPurchaseRequired,
     );
 
     for (const chapter of chaptersList) {
@@ -310,11 +317,6 @@ export class AppService {
     );
     await fs.promises.mkdir(novelDirectory, { recursive: true });
 
-    const chaptersList = await this.getAvailableChapterToDownload(
-      bookId,
-      token,
-    );
-
     const exportsDirectory = path.join(novelDirectory, 'exports/');
     await fs.promises.mkdir(exportsDirectory, { recursive: true });
 
@@ -333,11 +335,16 @@ export class AppService {
     const bookProject = `${projectDirectory}${this.cleanTitle(
       bookInfo.title,
     )}.fictionlog`;
-    const bookMetaProject = `${projectDirectory}${this.cleanTitle(
-      bookInfo.title,
-    )}.meta`;
 
     const chapters = [];
+
+    // All chapters
+    const allChaptersList = await this.getChapterList(bookId, token);
+
+    // Purchased chapters
+    const chaptersList = allChaptersList.filter(
+      (chapter) => !chapter.isPurchaseRequired,
+    );
 
     for (const chapter of chaptersList) {
       const chapterFile = `${novelDirectory}${this.cleanTitle(
@@ -364,6 +371,8 @@ export class AppService {
       }
 
       const chapterData = {
+        _id: chapter._id,
+        order: chapter.order,
         title: chapterDetail.title,
         data: chapterRaw,
         blocks: chapterBlocks,
@@ -399,29 +408,13 @@ export class AppService {
       await this.generateEpub(book);
     }
 
-    const sessionMeta = {
-      totalChapters: chapters.length,
-      bookId: bookId,
-      token: token,
-      title: bookInfo.title,
-      coverImage: bookInfo.coverImage,
-      description: bookInfo.description,
-      hashtags: bookInfo.hashtags,
-      author: bookInfo.authorName || bookInfo.user.displayName,
-      translator: bookInfo.translatorName || bookInfo.user.displayName,
-    };
-
-    if (!fs.existsSync(bookMetaProject)) {
-      fs.writeFileSync(bookProject, JSON.stringify(book));
-      fs.writeFileSync(bookMetaProject, JSON.stringify(sessionMeta));
+    if (fs.existsSync(bookProject)) {
+      const existedProject = JSON.parse(fs.readFileSync(bookProject, 'utf8'));
+      book.chapters = _.unionBy(book.chapters, existedProject.chapters, '_id');
+      book.chapters = _.sortBy(book.chapters, 'order');
     }
 
-    const previousMeta = JSON.parse(fs.readFileSync(bookMetaProject, 'utf8'));
-
-    if (sessionMeta.totalChapters > previousMeta.totalChapters) {
-      fs.writeFileSync(bookProject, JSON.stringify(book));
-      fs.writeFileSync(bookMetaProject, JSON.stringify(sessionMeta));
-    }
+    fs.writeFileSync(bookProject, JSON.stringify(book));
 
     return {
       success: true,

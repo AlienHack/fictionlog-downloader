@@ -53,22 +53,94 @@ export class AppService {
       .filter((path) => fs.statSync(path).isDirectory());
   }
 
-  async generateEbooks() {
+  getMissingChapters(allChapters, chapters, path) {
+    const chaptersOrder = chapters.map(({ order }) => order);
+    const missingChapters = [];
+    let textToWrite = '';
+    for (let i = 1; i <= allChapters.length; ++i) {
+      if (chaptersOrder.indexOf(i) == -1) {
+        textToWrite += `${allChapters[i - 1]._id}|${allChapters[i - 1].order}|${
+          allChapters[i - 1].title
+        }\r\n`;
+        missingChapters.push({
+          _id: allChapters[i - 1]._id,
+          order: allChapters[i - 1].order,
+          title: allChapters[i - 1].title,
+        });
+      }
+    }
+
+    if (missingChapters.length != 0) fs.writeFileSync(path, textToWrite);
+    return missingChapters;
+  }
+
+  async generateEbooks(token: string) {
+    if (!token)
+      throw new HttpException('Invalid token', HttpStatus.BAD_REQUEST);
+
+    const booksDirectory = path.join(__dirname, '../../exports/');
     const downloadDirectory = path.join(__dirname, '../../downloads/');
     const novelDirectories = this.getDirectories(downloadDirectory);
 
+    await fs.promises.mkdir(booksDirectory, { recursive: true });
+
     for (const novelDirectory of novelDirectories) {
-      try {
-        const projectDirectory = path.join(novelDirectory, '/project/');
-        const projectFile = path.join(
-          projectDirectory,
-          fs.readdirSync(projectDirectory)[0],
+      const projectDirectory = path.join(novelDirectory, '/project/');
+      const projectFile = path.join(
+        projectDirectory,
+        fs.readdirSync(projectDirectory)[0],
+      );
+
+      const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+
+      const outputDirectory = path.join(
+        booksDirectory,
+        this.cleanTitle(book.title),
+        '/',
+      );
+      await fs.promises.mkdir(outputDirectory, { recursive: true });
+
+      const allChaptersList = await this.getChapterList(book._id, token);
+
+      this.getMissingChapters(
+        allChaptersList,
+        book.chapters,
+        outputDirectory + 'missingChapters.txt',
+      );
+
+      const chapterContent = book.chapters;
+      const totalChapter = book.chapters.length;
+      let chapterFrom = 1;
+      let chapterTo = 100;
+      if (chapterTo > totalChapter) {
+        chapterTo = totalChapter;
+      }
+      while (chapterTo <= totalChapter) {
+        const fileName = path.join(
+          outputDirectory,
+          this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
         );
-        const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-        await this.generateEpub(book);
-        await this.generateWord(book);
-      } catch (err) {
-        this.logger.error(err);
+
+        if (!fs.existsSync(fileName)) {
+          book.chapters = chapterContent.filter(
+            (c) => c.order >= chapterFrom && c.order <= chapterTo,
+          );
+          try {
+            await this.generateEpubByPage(book, fileName);
+          } catch (err) {
+            this.logger.error(err);
+          }
+        }
+        chapterFrom = chapterTo + 1;
+        chapterTo = chapterTo + 100;
+
+        if (chapterFrom > totalChapter) {
+          break;
+        }
+
+        if (chapterTo > totalChapter) {
+          chapterTo = totalChapter;
+        }
       }
     }
     return { status: 'success' };
@@ -347,14 +419,17 @@ export class AppService {
     );
 
     for (const chapter of chaptersList) {
-      const chapterFile = `${novelDirectory}${this.cleanTitle(
-        chapter.title,
-      )}.txt`;
-      const rawFile = `${rawDirectory}${this.cleanTitle(chapter.title)}.txt`;
+      const chapterFile = `${novelDirectory}${this.zero_padding(
+        chapter.order,
+        5,
+      )}_${chapter._id}.txt`;
+      const rawFile = `${rawDirectory}${this.zero_padding(chapter.order, 5)}_${
+        chapter._id
+      }.txt`;
 
-      if (fs.existsSync(chapterFile)) {
-        const chapter = fs.readFileSync(rawFile, 'utf8');
-        chapters.push(JSON.parse(chapter));
+      if (fs.existsSync(rawFile)) {
+        const rawCh = JSON.parse(fs.readFileSync(rawFile, 'utf8'));
+        chapters.push(rawCh);
         continue;
       }
 
@@ -385,6 +460,7 @@ export class AppService {
     }
 
     const book = {
+      _id: bookId,
       title: bookInfo.title,
       coverImage: bookInfo.coverImage,
       description: bookInfo.description,
@@ -516,5 +592,10 @@ export class AppService {
     });
     const buffer = await docx.Packer.toBuffer(doc);
     fs.writeFileSync(bookInfo.bookPathWord, buffer);
+  }
+
+  async generateEpubByPage(bookInfo, outputPath): Promise<any> {
+    bookInfo.bookPathEpub = outputPath;
+    await this.generateEpub(bookInfo);
   }
 }

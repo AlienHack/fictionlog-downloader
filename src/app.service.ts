@@ -70,7 +70,7 @@ export class AppService {
       }
     }
 
-    fs.writeFileSync(path, textToWrite);
+    if (missingChapters.length != 0) fs.writeFileSync(path, textToWrite);
     return missingChapters;
   }
 

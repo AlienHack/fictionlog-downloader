@@ -53,18 +53,24 @@ export class AppService {
       .filter((path) => fs.statSync(path).isDirectory());
   }
 
-  getMissingChapters(allChapters, chapters) {
+  getMissingChapters(allChapters, chapters, path) {
     const chaptersOrder = chapters.map(({ order }) => order);
     const missingChapters = [];
+    let textToWrite = '';
     for (let i = 1; i <= allChapters.length; ++i) {
       if (chaptersOrder.indexOf(i) == -1) {
+        textToWrite += `${allChapters[i - 1]._id}|${allChapters[i - 1].order}|${
+          allChapters[i - 1].title
+        }\r\n`;
         missingChapters.push({
-          _id: allChapters[i]._id,
-          order: allChapters[i].order,
-          title: allChapters[i].title,
+          _id: allChapters[i - 1]._id,
+          order: allChapters[i - 1].order,
+          title: allChapters[i - 1].title,
         });
       }
     }
+
+    fs.writeFileSync(path, textToWrite);
     return missingChapters;
   }
 
@@ -92,17 +98,14 @@ export class AppService {
         this.cleanTitle(book.title),
         '/',
       );
+      await fs.promises.mkdir(outputDirectory, { recursive: true });
 
       const allChaptersList = await this.getChapterList(book._id, token);
 
-      const missingChapters = this.getMissingChapters(
+      this.getMissingChapters(
         allChaptersList,
         book.chapters,
-      );
-
-      fs.writeFileSync(
         outputDirectory + 'missingChapters.txt',
-        JSON.stringify(missingChapters),
       );
 
       const chapterContent = book.chapters;
@@ -113,7 +116,6 @@ export class AppService {
         chapterTo = totalChapter;
       }
       while (chapterTo <= totalChapter) {
-        await fs.promises.mkdir(outputDirectory, { recursive: true });
         const fileName = path.join(
           outputDirectory,
           this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,

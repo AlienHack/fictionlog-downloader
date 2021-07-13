@@ -74,7 +74,8 @@ export class AppController {
   }
 
   @Get('generateEbooks')
-  async generateEbooks() {
+  async generateEbooks(@Query('token') token: string) {
+    token = token || process.env.TOKEN;
     return await this.appService.generateEbooks();
   }
 }

@@ -53,18 +53,25 @@ export class AppService {
       .filter((path) => fs.statSync(path).isDirectory());
   }
 
-  getMissingChapters(totalChapter, chapters) {
+  getMissingChapters(allChapters, chapters) {
     const chaptersOrder = chapters.map(({ order }) => order);
     const missingChapters = [];
-    for (let i = 1; i <= totalChapter; ++i) {
+    for (let i = 1; i <= allChapters.length; ++i) {
       if (chaptersOrder.indexOf(i) == -1) {
-        missingChapters.push(i);
+        missingChapters.push({
+          _id: allChapters[i]._id,
+          order: allChapters[i].order,
+          title: allChapters[i].title,
+        });
       }
     }
     return missingChapters;
   }
 
-  async generateEbooks() {
+  async generateEbooks(token: string) {
+    if (!token)
+      throw new HttpException('Invalid token', HttpStatus.BAD_REQUEST);
+
     const booksDirectory = path.join(__dirname, '../../exports/');
     const downloadDirectory = path.join(__dirname, '../../downloads/');
     const novelDirectories = this.getDirectories(downloadDirectory);
@@ -77,8 +84,27 @@ export class AppService {
         projectDirectory,
         fs.readdirSync(projectDirectory)[0],
       );
+
       const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-      book.bookPathEpub = projectDirectory + 'test.epub';
+
+      const outputDirectory = path.join(
+        booksDirectory,
+        this.cleanTitle(book.title),
+        '/',
+      );
+
+      const allChaptersList = await this.getChapterList(book._id, token);
+
+      const missingChapters = this.getMissingChapters(
+        allChaptersList,
+        book.chapters,
+      );
+
+      fs.writeFileSync(
+        outputDirectory + 'missingChapters.txt',
+        JSON.stringify(missingChapters),
+      );
+
       const chapterContent = book.chapters;
       const totalChapter = book.chapters.length;
       let chapterFrom = 1;
@@ -87,11 +113,6 @@ export class AppService {
         chapterTo = totalChapter;
       }
       while (chapterTo <= totalChapter) {
-        const outputDirectory = path.join(
-          booksDirectory,
-          this.cleanTitle(book.title),
-          '/',
-        );
         await fs.promises.mkdir(outputDirectory, { recursive: true });
         const fileName = path.join(
           outputDirectory,

@@ -62,11 +62,7 @@ export class AppService {
         textToWrite += `${allChapters[i - 1]._id}|${allChapters[i - 1].order}|${
           allChapters[i - 1].title
         }\r\n`;
-        missingChapters.push({
-          _id: allChapters[i - 1]._id,
-          order: allChapters[i - 1].order,
-          title: allChapters[i - 1].title,
-        });
+        missingChapters.push(allChapters[i - 1]);
       }
     }
 

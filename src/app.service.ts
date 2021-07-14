@@ -61,7 +61,7 @@ export class AppService {
       if (chaptersOrder.indexOf(i) == -1) {
         textToWrite += `${allChapters[i - 1]._id}|${allChapters[i - 1].order}|${
           allChapters[i - 1].title
-        }\r\n`;
+        }|${new Date(allChapters[i - 1].publishedAt)}\r\n`;
         missingChapters.push(allChapters[i - 1]);
       }
     }

@@ -61,7 +61,7 @@ export class AppService {
       if (chaptersOrder.indexOf(i) == -1) {
         textToWrite += `${allChapters[i - 1]._id}|${allChapters[i - 1].order}|${
           allChapters[i - 1].title
-        }|${new Date(allChapters[i - 1].publishedAt)}\r\n`;
+        }|${new Date(allChapters[i - 1].publishedAt).toLocaleString()}\r\n`;
         missingChapters.push(allChapters[i - 1]);
       }
     }
@@ -113,21 +113,36 @@ export class AppService {
           chapterTo = totalChapter;
         }
         while (chapterTo <= totalChapter) {
-          const fileName = path.join(
+          const fileNameEpub = path.join(
             outputDirectory,
             this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
           );
 
-          if (!fs.existsSync(fileName)) {
-            book.chapters = chapterContent.filter(
-              (c) => c.order >= chapterFrom && c.order <= chapterTo,
-            );
+          const fileNameWord = path.join(
+            outputDirectory,
+            this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.docx`,
+          );
+
+          book.chapters = chapterContent.filter(
+            (c) => c.order >= chapterFrom && c.order <= chapterTo,
+          );
+
+          if (!fs.existsSync(fileNameEpub)) {
             try {
-              await this.generateEpubByPage(book, fileName);
+              await this.generateEpubByPage(book, fileNameEpub);
             } catch (err) {
               this.logger.error(err);
             }
           }
+
+          if (!fs.existsSync(fileNameWord)) {
+            try {
+              await this.generateWordByPage(book, fileNameWord);
+            } catch (err) {
+              this.logger.error(err);
+            }
+          }
+
           chapterFrom = chapterTo + 1;
           chapterTo = chapterTo + 100;
 
@@ -700,5 +715,10 @@ export class AppService {
   async generateEpubByPage(bookInfo, outputPath): Promise<any> {
     bookInfo.bookPathEpub = outputPath;
     await this.generateEpub(bookInfo);
+  }
+
+  async generateWordByPage(bookInfo, outputPath): Promise<any> {
+    bookInfo.bookPathWord = outputPath;
+    await this.generateWord(bookInfo);
   }
 }

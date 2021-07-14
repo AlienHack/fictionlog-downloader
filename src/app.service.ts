@@ -79,7 +79,7 @@ export class AppService {
     const novelDirectories = this.getDirectories(downloadDirectory);
 
     await fs.promises.mkdir(booksDirectory, { recursive: true });
-
+    let errorBookId = '';
     for (const novelDirectory of novelDirectories) {
       try {
         const projectDirectory = path.join(novelDirectory, '/project/');
@@ -89,7 +89,7 @@ export class AppService {
         );
 
         const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-
+        errorBookId = book._id;
         const outputDirectory = path.join(
           booksDirectory,
           this.cleanTitle(book.title),
@@ -140,7 +140,10 @@ export class AppService {
           }
         }
       } catch (err) {
-        this.logger.error('Error: Something went wrong in ' + novelDirectory);
+        this.logger.error(
+          'Error: Something went wrong in ' + novelDirectory + ' repairing... ',
+        );
+        await this.downloadBook(errorBookId, token, 'docx', false);
       }
     }
     return { status: 'success' };
@@ -360,10 +363,109 @@ export class AppService {
     return { status: 'success' };
   }
 
+  async purchaseAllChaptersToLibrary(bookId: string, token: string) {
+    if (!token)
+      throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
+    if (!bookId)
+      throw new HttpException('bookId is required', HttpStatus.BAD_REQUEST);
+
+    const isAuthenticated = await this.isAuthenticated(token);
+    if (!isAuthenticated) {
+      throw new HttpException(
+        'User is not authenticated',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const bookInfo = await this.getBookDetail(bookId, token);
+
+    const allChaptersList = await this.getChapterList(bookId, token);
+
+    const chaptersList = allChaptersList.filter(
+      (chapter) => chapter.isPurchaseRequired,
+    );
+
+    const downloadDirectory = path.join(__dirname, '../../downloads/');
+
+    const novelDirectory = path.join(
+      downloadDirectory,
+      this.cleanTitle(bookInfo.title),
+      '/',
+    );
+    await fs.promises.mkdir(novelDirectory, { recursive: true });
+
+    const exportsDirectory = path.join(novelDirectory, 'exports/');
+    await fs.promises.mkdir(exportsDirectory, { recursive: true });
+
+    const rawDirectory = path.join(novelDirectory, 'raw/');
+    await fs.promises.mkdir(rawDirectory, { recursive: true });
+
+    const projectDirectory = path.join(novelDirectory, 'project/');
+    await fs.promises.mkdir(projectDirectory, { recursive: true });
+
+    const bookProject = `${projectDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.fictionlog`;
+
+    let chapterToPurchase = [];
+
+    if (fs.existsSync(bookProject)) {
+      const existedProject = JSON.parse(fs.readFileSync(bookProject, 'utf8'));
+      chapterToPurchase = _.differenceBy(
+        chaptersList,
+        existedProject.chapters,
+        '_id',
+      );
+    } else {
+      this.logger.warn(
+        'Please download full book first: ' + bookId + ' ' + bookInfo.title,
+      );
+    }
+
+    for (const chapter of chapterToPurchase) {
+      const chapterId = chapter._id;
+      const price = +chapter.price.goldCoin;
+
+      const query = purchaseChapter;
+      const variables = purchaseChaptersVariable;
+      variables.chapterId = chapterId;
+      variables.input.amount = +price;
+
+      const { body } = await got.post(requestUrl, {
+        body: JSON.stringify({
+          query: query,
+          variables: variables,
+        }),
+        headers: {
+          authorization: `JWT ${token}`,
+          'Content-Type': 'application/json',
+        },
+        retry: {
+          limit: 3,
+          methods: ['GET', 'POST'],
+        },
+      });
+      const result = JSON.parse(body);
+      if (!result.data) {
+        this.logger.error(
+          `Purchased ${chapter.title} from book ${bookInfo.title} failed!`,
+        );
+        break;
+      }
+      this.logger.verbose(
+        `Purchased ${chapter.title} from book ${bookInfo.title} successfully!`,
+      );
+    }
+
+    await this.downloadBook(bookId, token, 'docx', false);
+    return { status: 'success' };
+  }
+
   async downloadBook(
     bookId: string,
     token: string,
     bookType: string,
+    isGen: boolean,
   ): Promise<any> {
     if (!token)
       throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
@@ -476,12 +578,13 @@ export class AppService {
       bookType === 'docx' ? 'docx' : 'epub'
     }`;
 
-    this.logger.verbose(`Generating ${bookName}`);
-
-    if (bookType === 'docx') {
-      await this.generateWord(book);
-    } else {
-      await this.generateEpub(book);
+    if (isGen) {
+      this.logger.verbose(`Generating ${bookName}`);
+      if (bookType === 'docx') {
+        await this.generateWord(book);
+      } else {
+        await this.generateEpub(book);
+      }
     }
 
     if (fs.existsSync(bookProject)) {

@@ -90,6 +90,8 @@ export class AppService {
         );
 
         const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+        await this.downloadBook(book._id, token, 'docx', false);
+
         errorBookId = book._id;
         const outputDirectory = path.join(
           booksDirectory,
@@ -635,7 +637,6 @@ export class AppService {
     const sections = [
       {
         properties: {
-          type: docx.SectionType.NEXT_PAGE,
           page: {
             margin: {
               top: 720,
@@ -650,7 +651,7 @@ export class AppService {
           },
         },
         children: [
-          new docx.TableOfContents('Table of Content', {
+          new docx.TableOfContents('สารบัญ', {
             hyperlink: true,
             headingStyleRange: '1-1',
           }),
@@ -680,7 +681,7 @@ export class AppService {
               new docx.TextRun({
                 text: '\t' + paragraph.text.trim(),
                 size: 40,
-                font: 'Angsana New',
+                font: 'TH Sarabun New',
               }),
             ],
             alignment: 'thaiDistribute' as AlignmentType,
@@ -722,7 +723,7 @@ export class AppService {
             run: {
               size: 70,
               bold: true,
-              font: 'Angsana New',
+              font: 'TH Sarabun New',
               color: '#50A8F2',
             },
             paragraph: {
@@ -730,6 +731,19 @@ export class AppService {
                 after: 120,
               },
               alignment: AlignmentType.CENTER,
+            },
+          },
+          {
+            id: 'TOC1',
+            name: 'toc 1',
+            basedOn: 'Normal',
+            next: 'Normal',
+            quickFormat: true,
+            paragraph: {},
+            run: {
+              font: 'TH Sarabun New',
+              color: '#000000',
+              size: 40,
             },
           },
         ],
@@ -747,12 +761,15 @@ export class AppService {
 
     for (const chapter of bookInfo.chapters) {
       let pObj = docx.createP();
-      pObj.addText(chapter.title, { font_face: 'Angsana New', font_size: 40 });
+      pObj.addText(chapter.title, {
+        font_face: 'TH Sarabun New',
+        font_size: 40,
+      });
       pObj.addHorizontalLine();
       for (const paragraph of chapter.blocks) {
         pObj = docx.createP();
         pObj.addText('\t' + paragraph.text.trim(), {
-          font_face: 'Angsana New',
+          font_face: 'TH Sarabun New',
           font_size: 20,
         });
       }

@@ -634,8 +634,23 @@ export class AppService {
   async generateWord(bookInfo): Promise<any> {
     const sections = [
       {
+        properties: {
+          type: docx.SectionType.NEXT_PAGE,
+          page: {
+            margin: {
+              top: 720,
+              right: 720,
+              bottom: 720,
+              left: 720,
+            },
+            size: {
+              width: 8390.55,
+              height: 11905.51,
+            },
+          },
+        },
         children: [
-          new docx.TableOfContents('Table of Contents', {
+          new docx.TableOfContents('Table of Content', {
             hyperlink: true,
             headingStyleRange: '1-1',
           }),
@@ -675,6 +690,18 @@ export class AppService {
       const section = {
         properties: {
           type: docx.SectionType.NEXT_PAGE,
+          page: {
+            margin: {
+              top: 720,
+              right: 720,
+              bottom: 720,
+              left: 720,
+            },
+            size: {
+              width: 8390.55,
+              height: 11905.51,
+            },
+          },
         },
         children: paragraphs,
       };
@@ -696,7 +723,7 @@ export class AppService {
               size: 70,
               bold: true,
               font: 'Angsana New',
-              color: '#00D2FF',
+              color: '#50A8F2',
             },
             paragraph: {
               spacing: {
@@ -709,6 +736,8 @@ export class AppService {
       },
       sections: sections,
     });
+
+    doc.Settings.addUpdateFields();
     const buffer = await docx.Packer.toBuffer(doc);
     fs.writeFileSync(bookInfo.bookPathWord, buffer);
   }

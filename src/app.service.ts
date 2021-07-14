@@ -70,7 +70,7 @@ export class AppService {
       }
     }
 
-    if (missingChapters.length != 0) fs.writeFileSync(path, textToWrite);
+    fs.writeFileSync(path, textToWrite);
     return missingChapters;
   }
 
@@ -85,62 +85,66 @@ export class AppService {
     await fs.promises.mkdir(booksDirectory, { recursive: true });
 
     for (const novelDirectory of novelDirectories) {
-      const projectDirectory = path.join(novelDirectory, '/project/');
-      const projectFile = path.join(
-        projectDirectory,
-        fs.readdirSync(projectDirectory)[0],
-      );
-
-      const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-
-      const outputDirectory = path.join(
-        booksDirectory,
-        this.cleanTitle(book.title),
-        '/',
-      );
-      await fs.promises.mkdir(outputDirectory, { recursive: true });
-
-      const allChaptersList = await this.getChapterList(book._id, token);
-
-      this.getMissingChapters(
-        allChaptersList,
-        book.chapters,
-        outputDirectory + 'missingChapters.txt',
-      );
-
-      const chapterContent = book.chapters;
-      const totalChapter = book.chapters.length;
-      let chapterFrom = 1;
-      let chapterTo = 100;
-      if (chapterTo > totalChapter) {
-        chapterTo = totalChapter;
-      }
-      while (chapterTo <= totalChapter) {
-        const fileName = path.join(
-          outputDirectory,
-          this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
+      try {
+        const projectDirectory = path.join(novelDirectory, '/project/');
+        const projectFile = path.join(
+          projectDirectory,
+          fs.readdirSync(projectDirectory)[0],
         );
 
-        if (!fs.existsSync(fileName)) {
-          book.chapters = chapterContent.filter(
-            (c) => c.order >= chapterFrom && c.order <= chapterTo,
-          );
-          try {
-            await this.generateEpubByPage(book, fileName);
-          } catch (err) {
-            this.logger.error(err);
-          }
-        }
-        chapterFrom = chapterTo + 1;
-        chapterTo = chapterTo + 100;
+        const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
 
-        if (chapterFrom > totalChapter) {
-          break;
-        }
+        const outputDirectory = path.join(
+          booksDirectory,
+          this.cleanTitle(book.title),
+          '/',
+        );
+        await fs.promises.mkdir(outputDirectory, { recursive: true });
 
+        const allChaptersList = await this.getChapterList(book._id, token);
+
+        this.getMissingChapters(
+          allChaptersList,
+          book.chapters,
+          outputDirectory + 'missingChapters.txt',
+        );
+
+        const chapterContent = book.chapters;
+        const totalChapter = book.chapters.length;
+        let chapterFrom = 1;
+        let chapterTo = 100;
         if (chapterTo > totalChapter) {
           chapterTo = totalChapter;
         }
+        while (chapterTo <= totalChapter) {
+          const fileName = path.join(
+            outputDirectory,
+            this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
+          );
+
+          if (!fs.existsSync(fileName)) {
+            book.chapters = chapterContent.filter(
+              (c) => c.order >= chapterFrom && c.order <= chapterTo,
+            );
+            try {
+              await this.generateEpubByPage(book, fileName);
+            } catch (err) {
+              this.logger.error(err);
+            }
+          }
+          chapterFrom = chapterTo + 1;
+          chapterTo = chapterTo + 100;
+
+          if (chapterFrom > totalChapter) {
+            break;
+          }
+
+          if (chapterTo > totalChapter) {
+            chapterTo = totalChapter;
+          }
+        }
+      } catch (err) {
+        this.logger.error('Error: Something went wrong in ' + novelDirectory);
       }
     }
     return { status: 'success' };

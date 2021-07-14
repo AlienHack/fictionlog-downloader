@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as epub from 'epub-gen';
 import * as docx from 'docx';
+import * as officegen from 'officegen';
 import * as _ from 'lodash';
 import { version } from '../package.json';
 import {
@@ -710,6 +711,27 @@ export class AppService {
     });
     const buffer = await docx.Packer.toBuffer(doc);
     fs.writeFileSync(bookInfo.bookPathWord, buffer);
+  }
+
+  async generateWordExt(bookInfo): Promise<any> {
+    const docx = officegen('docx');
+
+    for (const chapter of bookInfo.chapters) {
+      let pObj = docx.createP();
+      pObj.addText(chapter.title, { font_face: 'Angsana New', font_size: 40 });
+      pObj.addHorizontalLine();
+      for (const paragraph of chapter.blocks) {
+        pObj = docx.createP();
+        pObj.addText('\t' + paragraph.text.trim(), {
+          font_face: 'Angsana New',
+          font_size: 20,
+        });
+      }
+      docx.putPageBreak();
+    }
+
+    const out = fs.createWriteStream(bookInfo.bookPathWord);
+    await docx.generate(out);
   }
 
   async generateEpubByPage(bookInfo, outputPath): Promise<any> {

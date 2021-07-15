@@ -865,7 +865,7 @@ export class AppService {
     sections.push(coverSection);
     sections.push(tocSection);
     sections.push(briefDescriptionSection);
-    //sections.push(contentSection);
+    sections.push(contentSection);
 
     const doc = new docx.Document({
       creator: 'Created By Fictionlog Downloader v' + version,

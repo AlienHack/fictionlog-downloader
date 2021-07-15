@@ -57,7 +57,14 @@ export class AppController {
   ) {
     token = token || process.env.TOKEN;
     bookType = bookType || 'epub';
-    const gen = isGen == 'true';
+    let gen;
+
+    if (!isGen) {
+      gen = true;
+    } else {
+      gen = isGen == 'true';
+    }
+
     const bookData = await this.appService.downloadBook(
       bookId,
       token,

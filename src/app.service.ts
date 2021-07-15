@@ -20,8 +20,9 @@ import {
   purchaseChaptersVariable,
   requestUrl,
 } from './schemas/fictionlog-schema';
-import { AlignmentType, HeadingLevel } from 'docx';
+import { AlignmentType, HeadingLevel, ImageRun, Paragraph } from 'docx';
 import { Logger } from '@nestjs/common';
+import { forEach } from 'lodash';
 
 @Injectable()
 export class AppService {
@@ -584,6 +585,7 @@ export class AppService {
       title: bookInfo.title,
       coverImage: bookInfo.coverImage,
       description: bookInfo.description,
+      fullDescription: bookInfo.contentRawState.blocks,
       hashtags: bookInfo.hashtags,
       author: bookInfo.authorName || bookInfo.user.displayName,
       translator: bookInfo.translatorName || bookInfo.user.displayName,
@@ -616,27 +618,180 @@ export class AppService {
     return {
       success: true,
       detail: `The epub/docx has been downloaded and generated`,
-      bookPath: `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
+      bookPath: path.resolve(
+        `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
+      ),
       bookName: bookName,
     };
   }
 
   async generateEpub(bookInfo): Promise<any> {
+    let fullDesc = '';
+    if (bookInfo.fullDescription.length > 0) {
+      for (const desc of bookInfo.fullDescription) {
+        fullDesc += '<p>' + desc.text.trim() + '</p>';
+      }
+
+      const briefDescription = {
+        title: 'รายละเอียด',
+        data: fullDesc,
+      };
+      bookInfo.chapters.unshift(briefDescription);
+    }
+
+    const customCss = `
+    @font-face {
+      font-family: "THSarabunNew";
+      font-style: normal;
+      font-weight: normal;
+      src : url("./fonts/THSarabunNew.ttf");
+    }
+
+    p { 
+      font-family: "THSarabunNew";
+    }
+
+    h1 { 
+      font-family: "THSarabunNew";
+    }
+
+    * { 
+      font-family: "THSarabunNew";
+    }
+  `;
+
     const option = {
       title: bookInfo.title,
       author: bookInfo.author,
       publisher: bookInfo.author,
       cover: bookInfo.coverImage,
       content: bookInfo.chapters,
+      lang: 'th',
+      fonts: [path.join(__dirname, '../../fonts/THSarabunNew.ttf')],
+      css: customCss,
       verbose: false,
+      tocTitle: 'สารบัญ',
     };
     await new epub(option, bookInfo.bookPathEpub).promise;
   }
 
   async generateWord(bookInfo): Promise<any> {
-    const sections = [
-      {
+    const sections = [];
+    const imageBuffer = (
+      await got.get(bookInfo.coverImage, { responseType: 'buffer' })
+    ).body;
+
+    // Construct Cover and ToC
+    const coverImage = new ImageRun({
+      data: imageBuffer,
+      transformation: {
+        width: 559,
+        height: 794,
+      },
+      floating: {
+        horizontalPosition: {
+          offset: 0,
+        },
+        verticalPosition: {
+          offset: 0,
+        },
+      },
+    });
+
+    const coverSection = {
+      properties: {
+        type: docx.SectionType.NEXT_PAGE,
+        page: {
+          margin: {
+            top: 720,
+            right: 720,
+            bottom: 720,
+            left: 720,
+          },
+          size: {
+            width: 8390.55,
+            height: 11905.51,
+          },
+        },
+      },
+      children: [
+        new docx.Paragraph({
+          children: [coverImage],
+        }),
+      ],
+    };
+
+    const tocSection = {
+      properties: {
+        page: {
+          margin: {
+            top: 720,
+            right: 720,
+            bottom: 720,
+            left: 720,
+          },
+          size: {
+            width: 8390.55,
+            height: 11905.51,
+          },
+        },
+      },
+      children: [
+        new docx.Paragraph({
+          text: 'สารบัญ',
+          heading: HeadingLevel.HEADING_1,
+          border: {
+            bottom: {
+              color: 'auto',
+              space: 1,
+              value: 'single',
+              size: 6,
+            },
+          },
+        }),
+        new docx.TableOfContents('สารบัญ', {
+          hyperlink: true,
+          headingStyleRange: '1-1',
+        }),
+      ],
+    };
+
+    let briefDescriptionSection;
+
+    // Construct Brief Description
+    if (bookInfo.fullDescription.length > 0) {
+      const paragraphs = [];
+      paragraphs.push(
+        new docx.Paragraph({
+          text: 'รายละเอียด',
+          heading: HeadingLevel.HEADING_1,
+          border: {
+            bottom: {
+              color: 'auto',
+              space: 1,
+              value: 'single',
+              size: 6,
+            },
+          },
+        }),
+      );
+      for (const desc of bookInfo.fullDescription) {
+        paragraphs.push(
+          new docx.Paragraph({
+            children: [
+              new docx.TextRun({
+                text: '\t' + desc.text.trim(),
+                size: 40,
+                font: 'TH Sarabun New',
+              }),
+            ],
+            alignment: 'thaiDistribute' as AlignmentType,
+          }),
+        );
+      }
+      briefDescriptionSection = {
         properties: {
+          type: docx.SectionType.NEXT_PAGE,
           page: {
             margin: {
               top: 720,
@@ -650,14 +805,13 @@ export class AppService {
             },
           },
         },
-        children: [
-          new docx.TableOfContents('สารบัญ', {
-            hyperlink: true,
-            headingStyleRange: '1-1',
-          }),
-        ],
-      },
-    ];
+        children: paragraphs,
+      };
+    }
+
+    let contentSection;
+
+    // Construct Contents
     for (const chapter of bookInfo.chapters) {
       const paragraphs = [];
       paragraphs.push(
@@ -688,7 +842,7 @@ export class AppService {
           }),
         );
       }
-      const section = {
+      contentSection = {
         properties: {
           type: docx.SectionType.NEXT_PAGE,
           page: {
@@ -706,10 +860,15 @@ export class AppService {
         },
         children: paragraphs,
       };
-      sections.push(section);
     }
+
+    sections.push(coverSection);
+    sections.push(tocSection);
+    sections.push(briefDescriptionSection);
+    //sections.push(contentSection);
+
     const doc = new docx.Document({
-      creator: 'AlienHack',
+      creator: 'Created By Fictionlog Downloader v' + version,
       description: bookInfo.description,
       title: bookInfo.title,
       styles: {

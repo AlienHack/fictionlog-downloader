@@ -1,6 +1,6 @@
 {
   "name": "fictionlog-downloader",
-  "version": "0.4",
+  "version": "0.5",
   "description": "A simple tool to download purchased novel from fictionlog",
   "author": "AlienHack",
   "private": true,
@@ -32,6 +32,7 @@
     "epub-gen": "^0.1.0",
     "got": "^11.8.2",
     "lodash": "^4.17.21",
+    "officegen": "^0.6.5",
     "reflect-metadata": "^0.1.13",
     "rimraf": "^3.0.2",
     "rxjs": "^7.2.0"

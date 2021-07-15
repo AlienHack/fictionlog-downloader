@@ -4,6 +4,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as epub from 'epub-gen';
 import * as docx from 'docx';
+import * as officegen from 'officegen';
 import * as _ from 'lodash';
 import { version } from '../package.json';
 import {
@@ -19,8 +20,9 @@ import {
   purchaseChaptersVariable,
   requestUrl,
 } from './schemas/fictionlog-schema';
-import { AlignmentType, HeadingLevel } from 'docx';
+import { AlignmentType, HeadingLevel, ImageRun, Paragraph } from 'docx';
 import { Logger } from '@nestjs/common';
+import { forEach } from 'lodash';
 
 @Injectable()
 export class AppService {
@@ -61,16 +63,12 @@ export class AppService {
       if (chaptersOrder.indexOf(i) == -1) {
         textToWrite += `${allChapters[i - 1]._id}|${allChapters[i - 1].order}|${
           allChapters[i - 1].title
-        }\r\n`;
-        missingChapters.push({
-          _id: allChapters[i - 1]._id,
-          order: allChapters[i - 1].order,
-          title: allChapters[i - 1].title,
-        });
+        }|${new Date(allChapters[i - 1].publishedAt).toLocaleString()}\r\n`;
+        missingChapters.push(allChapters[i - 1]);
       }
     }
 
-    if (missingChapters.length != 0) fs.writeFileSync(path, textToWrite);
+    fs.writeFileSync(path, textToWrite);
     return missingChapters;
   }
 
@@ -83,64 +81,88 @@ export class AppService {
     const novelDirectories = this.getDirectories(downloadDirectory);
 
     await fs.promises.mkdir(booksDirectory, { recursive: true });
-
+    let errorBookId = '';
     for (const novelDirectory of novelDirectories) {
-      const projectDirectory = path.join(novelDirectory, '/project/');
-      const projectFile = path.join(
-        projectDirectory,
-        fs.readdirSync(projectDirectory)[0],
-      );
-
-      const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-
-      const outputDirectory = path.join(
-        booksDirectory,
-        this.cleanTitle(book.title),
-        '/',
-      );
-      await fs.promises.mkdir(outputDirectory, { recursive: true });
-
-      const allChaptersList = await this.getChapterList(book._id, token);
-
-      this.getMissingChapters(
-        allChaptersList,
-        book.chapters,
-        outputDirectory + 'missingChapters.txt',
-      );
-
-      const chapterContent = book.chapters;
-      const totalChapter = book.chapters.length;
-      let chapterFrom = 1;
-      let chapterTo = 100;
-      if (chapterTo > totalChapter) {
-        chapterTo = totalChapter;
-      }
-      while (chapterTo <= totalChapter) {
-        const fileName = path.join(
-          outputDirectory,
-          this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
+      try {
+        const projectDirectory = path.join(novelDirectory, '/project/');
+        const projectFile = path.join(
+          projectDirectory,
+          fs.readdirSync(projectDirectory)[0],
         );
 
-        if (!fs.existsSync(fileName)) {
-          book.chapters = chapterContent.filter(
-            (c) => c.order >= chapterFrom && c.order <= chapterTo,
-          );
-          try {
-            await this.generateEpubByPage(book, fileName);
-          } catch (err) {
-            this.logger.error(err);
-          }
-        }
-        chapterFrom = chapterTo + 1;
-        chapterTo = chapterTo + 100;
+        const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+        await this.downloadBook(book._id, token, 'docx', false);
 
-        if (chapterFrom > totalChapter) {
-          break;
-        }
+        errorBookId = book._id;
+        const outputDirectory = path.join(
+          booksDirectory,
+          this.cleanTitle(book.title),
+          '/',
+        );
+        await fs.promises.mkdir(outputDirectory, { recursive: true });
 
+        const allChaptersList = await this.getChapterList(book._id, token);
+
+        this.getMissingChapters(
+          allChaptersList,
+          book.chapters,
+          outputDirectory + 'missingChapters.txt',
+        );
+
+        const chapterContent = book.chapters;
+        const totalChapter = book.chapters.length;
+        let chapterFrom = 1;
+        let chapterTo = 100;
         if (chapterTo > totalChapter) {
           chapterTo = totalChapter;
         }
+        while (chapterTo <= totalChapter) {
+          const fileNameEpub = path.join(
+            outputDirectory,
+            this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
+          );
+
+          const fileNameWord = path.join(
+            outputDirectory,
+            this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.docx`,
+          );
+
+          book.chapters = chapterContent.filter(
+            (c) => c.order >= chapterFrom && c.order <= chapterTo,
+          );
+
+          if (!fs.existsSync(fileNameEpub)) {
+            try {
+              await this.generateEpubByPage(book, fileNameEpub);
+            } catch (err) {
+              this.logger.error(err);
+            }
+          }
+
+          if (!fs.existsSync(fileNameWord)) {
+            try {
+              await this.generateWordByPage(book, fileNameWord);
+            } catch (err) {
+              this.logger.error(err);
+            }
+          }
+
+          chapterFrom = chapterTo + 1;
+          chapterTo = chapterTo + 100;
+
+          if (chapterFrom > totalChapter) {
+            break;
+          }
+
+          if (chapterTo > totalChapter) {
+            chapterTo = totalChapter;
+          }
+        }
+      } catch (err) {
+        this.logger.error(
+          'Error: Something went wrong in ' + novelDirectory + ' repairing... ',
+        );
+        await this.downloadBook(errorBookId, token, 'docx', false);
       }
     }
     return { status: 'success' };
@@ -360,10 +382,109 @@ export class AppService {
     return { status: 'success' };
   }
 
+  async purchaseAllChaptersToLibrary(bookId: string, token: string) {
+    if (!token)
+      throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
+    if (!bookId)
+      throw new HttpException('bookId is required', HttpStatus.BAD_REQUEST);
+
+    const isAuthenticated = await this.isAuthenticated(token);
+    if (!isAuthenticated) {
+      throw new HttpException(
+        'User is not authenticated',
+        HttpStatus.FORBIDDEN,
+      );
+    }
+
+    const bookInfo = await this.getBookDetail(bookId, token);
+
+    const allChaptersList = await this.getChapterList(bookId, token);
+
+    const chaptersList = allChaptersList.filter(
+      (chapter) => chapter.isPurchaseRequired,
+    );
+
+    const downloadDirectory = path.join(__dirname, '../../downloads/');
+
+    const novelDirectory = path.join(
+      downloadDirectory,
+      this.cleanTitle(bookInfo.title),
+      '/',
+    );
+    await fs.promises.mkdir(novelDirectory, { recursive: true });
+
+    const exportsDirectory = path.join(novelDirectory, 'exports/');
+    await fs.promises.mkdir(exportsDirectory, { recursive: true });
+
+    const rawDirectory = path.join(novelDirectory, 'raw/');
+    await fs.promises.mkdir(rawDirectory, { recursive: true });
+
+    const projectDirectory = path.join(novelDirectory, 'project/');
+    await fs.promises.mkdir(projectDirectory, { recursive: true });
+
+    const bookProject = `${projectDirectory}${this.cleanTitle(
+      bookInfo.title,
+    )}.fictionlog`;
+
+    let chapterToPurchase = [];
+
+    if (fs.existsSync(bookProject)) {
+      const existedProject = JSON.parse(fs.readFileSync(bookProject, 'utf8'));
+      chapterToPurchase = _.differenceBy(
+        chaptersList,
+        existedProject.chapters,
+        '_id',
+      );
+    } else {
+      this.logger.warn(
+        'Please download full book first: ' + bookId + ' ' + bookInfo.title,
+      );
+    }
+
+    for (const chapter of chapterToPurchase) {
+      const chapterId = chapter._id;
+      const price = +chapter.price.goldCoin;
+
+      const query = purchaseChapter;
+      const variables = purchaseChaptersVariable;
+      variables.chapterId = chapterId;
+      variables.input.amount = +price;
+
+      const { body } = await got.post(requestUrl, {
+        body: JSON.stringify({
+          query: query,
+          variables: variables,
+        }),
+        headers: {
+          authorization: `JWT ${token}`,
+          'Content-Type': 'application/json',
+        },
+        retry: {
+          limit: 3,
+          methods: ['GET', 'POST'],
+        },
+      });
+      const result = JSON.parse(body);
+      if (!result.data) {
+        this.logger.error(
+          `Purchased ${chapter.title} from book ${bookInfo.title} failed!`,
+        );
+        break;
+      }
+      this.logger.verbose(
+        `Purchased ${chapter.title} from book ${bookInfo.title} successfully!`,
+      );
+    }
+
+    await this.downloadBook(bookId, token, 'docx', false);
+    return { status: 'success' };
+  }
+
   async downloadBook(
     bookId: string,
     token: string,
     bookType: string,
+    isGen: boolean,
   ): Promise<any> {
     if (!token)
       throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
@@ -464,6 +585,7 @@ export class AppService {
       title: bookInfo.title,
       coverImage: bookInfo.coverImage,
       description: bookInfo.description,
+      fullDescription: bookInfo.contentRawState.blocks,
       hashtags: bookInfo.hashtags,
       author: bookInfo.authorName || bookInfo.user.displayName,
       translator: bookInfo.translatorName || bookInfo.user.displayName,
@@ -476,12 +598,13 @@ export class AppService {
       bookType === 'docx' ? 'docx' : 'epub'
     }`;
 
-    this.logger.verbose(`Generating ${bookName}`);
-
-    if (bookType === 'docx') {
-      await this.generateWord(book);
-    } else {
-      await this.generateEpub(book);
+    if (isGen) {
+      this.logger.verbose(`Generating ${bookName}`);
+      if (bookType === 'docx') {
+        await this.generateWord(book);
+      } else {
+        await this.generateEpub(book);
+      }
     }
 
     if (fs.existsSync(bookProject)) {
@@ -495,34 +618,200 @@ export class AppService {
     return {
       success: true,
       detail: `The epub/docx has been downloaded and generated`,
-      bookPath: `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
+      bookPath: path.resolve(
+        `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
+      ),
       bookName: bookName,
     };
   }
 
   async generateEpub(bookInfo): Promise<any> {
+    let fullDesc = '';
+    if (bookInfo.fullDescription.length > 0) {
+      for (const desc of bookInfo.fullDescription) {
+        fullDesc += '<p>' + desc.text.trim() + '</p>';
+      }
+
+      const briefDescription = {
+        title: 'รายละเอียด',
+        data: fullDesc,
+      };
+      bookInfo.chapters.unshift(briefDescription);
+    }
+
+    const customCss = `
+    @font-face {
+      font-family: "THSarabunNew";
+      font-style: normal;
+      font-weight: normal;
+      src : url("./fonts/THSarabunNew.ttf");
+    }
+
+    p { 
+      font-family: "THSarabunNew";
+    }
+
+    h1 { 
+      font-family: "THSarabunNew";
+    }
+
+    * { 
+      font-family: "THSarabunNew";
+    }
+  `;
+
     const option = {
       title: bookInfo.title,
       author: bookInfo.author,
       publisher: bookInfo.author,
       cover: bookInfo.coverImage,
       content: bookInfo.chapters,
+      lang: 'th',
+      fonts: [path.join(__dirname, '../../fonts/THSarabunNew.ttf')],
+      css: customCss,
       verbose: false,
+      tocTitle: 'สารบัญ',
     };
     await new epub(option, bookInfo.bookPathEpub).promise;
   }
 
   async generateWord(bookInfo): Promise<any> {
-    const sections = [
-      {
-        children: [
-          new docx.TableOfContents('Table of Contents', {
-            hyperlink: true,
-            headingStyleRange: '1-1',
-          }),
-        ],
+    const sections = [];
+    const imageBuffer = (
+      await got.get(bookInfo.coverImage, { responseType: 'buffer' })
+    ).body;
+
+    // Construct Cover and ToC
+    const coverImage = new ImageRun({
+      data: imageBuffer,
+      transformation: {
+        width: 559,
+        height: 794,
       },
-    ];
+      floating: {
+        horizontalPosition: {
+          offset: 0,
+        },
+        verticalPosition: {
+          offset: 0,
+        },
+      },
+    });
+
+    const coverSection = {
+      properties: {
+        type: docx.SectionType.NEXT_PAGE,
+        page: {
+          margin: {
+            top: 720,
+            right: 720,
+            bottom: 720,
+            left: 720,
+          },
+          size: {
+            width: 8390.55,
+            height: 11905.51,
+          },
+        },
+      },
+      children: [
+        new docx.Paragraph({
+          children: [coverImage],
+        }),
+      ],
+    };
+
+    const tocSection = {
+      properties: {
+        page: {
+          margin: {
+            top: 720,
+            right: 720,
+            bottom: 720,
+            left: 720,
+          },
+          size: {
+            width: 8390.55,
+            height: 11905.51,
+          },
+        },
+      },
+      children: [
+        new docx.Paragraph({
+          text: 'สารบัญ',
+          heading: HeadingLevel.HEADING_1,
+          border: {
+            bottom: {
+              color: 'auto',
+              space: 1,
+              value: 'single',
+              size: 6,
+            },
+          },
+        }),
+        new docx.TableOfContents('สารบัญ', {
+          hyperlink: true,
+          headingStyleRange: '1-1',
+        }),
+      ],
+    };
+
+    let briefDescriptionSection;
+
+    // Construct Brief Description
+    if (bookInfo.fullDescription.length > 0) {
+      const paragraphs = [];
+      paragraphs.push(
+        new docx.Paragraph({
+          text: 'รายละเอียด',
+          heading: HeadingLevel.HEADING_1,
+          border: {
+            bottom: {
+              color: 'auto',
+              space: 1,
+              value: 'single',
+              size: 6,
+            },
+          },
+        }),
+      );
+      for (const desc of bookInfo.fullDescription) {
+        paragraphs.push(
+          new docx.Paragraph({
+            children: [
+              new docx.TextRun({
+                text: '\t' + desc.text.trim(),
+                size: 40,
+                font: 'TH Sarabun New',
+              }),
+            ],
+            alignment: 'thaiDistribute' as AlignmentType,
+          }),
+        );
+      }
+      briefDescriptionSection = {
+        properties: {
+          type: docx.SectionType.NEXT_PAGE,
+          page: {
+            margin: {
+              top: 720,
+              right: 720,
+              bottom: 720,
+              left: 720,
+            },
+            size: {
+              width: 8390.55,
+              height: 11905.51,
+            },
+          },
+        },
+        children: paragraphs,
+      };
+    }
+
+    let contentSection;
+
+    // Construct Contents
     for (const chapter of bookInfo.chapters) {
       const paragraphs = [];
       paragraphs.push(
@@ -546,23 +835,40 @@ export class AppService {
               new docx.TextRun({
                 text: '\t' + paragraph.text.trim(),
                 size: 40,
-                font: 'Angsana New',
+                font: 'TH Sarabun New',
               }),
             ],
             alignment: 'thaiDistribute' as AlignmentType,
           }),
         );
       }
-      const section = {
+      contentSection = {
         properties: {
           type: docx.SectionType.NEXT_PAGE,
+          page: {
+            margin: {
+              top: 720,
+              right: 720,
+              bottom: 720,
+              left: 720,
+            },
+            size: {
+              width: 8390.55,
+              height: 11905.51,
+            },
+          },
         },
         children: paragraphs,
       };
-      sections.push(section);
     }
+
+    sections.push(coverSection);
+    sections.push(tocSection);
+    sections.push(briefDescriptionSection);
+    sections.push(contentSection);
+
     const doc = new docx.Document({
-      creator: 'AlienHack',
+      creator: 'Created By Fictionlog Downloader v' + version,
       description: bookInfo.description,
       title: bookInfo.title,
       styles: {
@@ -576,8 +882,8 @@ export class AppService {
             run: {
               size: 70,
               bold: true,
-              font: 'Angsana New',
-              color: '#00D2FF',
+              font: 'TH Sarabun New',
+              color: '#50A8F2',
             },
             paragraph: {
               spacing: {
@@ -586,16 +892,60 @@ export class AppService {
               alignment: AlignmentType.CENTER,
             },
           },
+          {
+            id: 'TOC1',
+            name: 'toc 1',
+            basedOn: 'Normal',
+            next: 'Normal',
+            quickFormat: true,
+            paragraph: {},
+            run: {
+              font: 'TH Sarabun New',
+              color: '#000000',
+              size: 40,
+            },
+          },
         ],
       },
       sections: sections,
     });
+
+    doc.Settings.addUpdateFields();
     const buffer = await docx.Packer.toBuffer(doc);
     fs.writeFileSync(bookInfo.bookPathWord, buffer);
+  }
+
+  async generateWordExt(bookInfo): Promise<any> {
+    const docx = officegen('docx');
+
+    for (const chapter of bookInfo.chapters) {
+      let pObj = docx.createP();
+      pObj.addText(chapter.title, {
+        font_face: 'TH Sarabun New',
+        font_size: 40,
+      });
+      pObj.addHorizontalLine();
+      for (const paragraph of chapter.blocks) {
+        pObj = docx.createP();
+        pObj.addText('\t' + paragraph.text.trim(), {
+          font_face: 'TH Sarabun New',
+          font_size: 20,
+        });
+      }
+      docx.putPageBreak();
+    }
+
+    const out = fs.createWriteStream(bookInfo.bookPathWord);
+    await docx.generate(out);
   }
 
   async generateEpubByPage(bookInfo, outputPath): Promise<any> {
     bookInfo.bookPathEpub = outputPath;
     await this.generateEpub(bookInfo);
+  }
+
+  async generateWordByPage(bookInfo, outputPath): Promise<any> {
+    bookInfo.bookPathWord = outputPath;
+    await this.generateWord(bookInfo);
   }
 }

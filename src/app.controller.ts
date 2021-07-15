@@ -52,14 +52,24 @@ export class AppController {
     @Param('bookId') bookId: string,
     @Query('token') token: string,
     @Query('bookType') bookType: string,
+    @Query('isGen') isGen: string,
     @Res() res: Response,
   ) {
     token = token || process.env.TOKEN;
     bookType = bookType || 'epub';
+    let gen;
+
+    if (!isGen) {
+      gen = true;
+    } else {
+      gen = isGen == 'true';
+    }
+
     const bookData = await this.appService.downloadBook(
       bookId,
       token,
       bookType,
+      gen,
     );
     return res.download(bookData.bookPath, bookData.bookName);
   }
@@ -71,6 +81,15 @@ export class AppController {
   ) {
     token = token || process.env.TOKEN;
     return this.appService.purchaseAllChapters(bookId, token);
+  }
+
+  @Get('purchaseBookToLibrary/:bookId')
+  async purchaseBookToLibrary(
+    @Param('bookId') bookId: string,
+    @Query('token') token: string,
+  ) {
+    token = token || process.env.TOKEN;
+    return this.appService.purchaseAllChaptersToLibrary(bookId, token);
   }
 
   @Get('generateEbooks')

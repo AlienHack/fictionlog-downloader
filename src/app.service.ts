@@ -83,6 +83,7 @@ export class AppService {
 
     await fs.promises.mkdir(booksDirectory, { recursive: true });
     let errorBookId = '';
+    let workCount = 1;
     for (const novelDirectory of novelDirectories) {
       try {
         const projectDirectory = path.join(novelDirectory, '/project/');
@@ -92,6 +93,11 @@ export class AppService {
         );
 
         let book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+        this.logger.verbose(
+          `[ ${workCount++} of ${novelDirectories.length}] Processing... ${
+            book.title
+          }`,
+        );
         const bookData = await this.downloadBook(
           book._id,
           token,

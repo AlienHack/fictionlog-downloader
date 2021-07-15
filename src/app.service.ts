@@ -91,8 +91,14 @@ export class AppService {
           fs.readdirSync(projectDirectory)[0],
         );
 
-        const book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-        await this.downloadBook(book._id, token, 'docx', false);
+        let book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+        const bookData = await this.downloadBook(
+          book._id,
+          token,
+          'docx',
+          false,
+        );
+        book = bookData.book;
 
         errorBookId = book._id;
         const outputDirectory = path.join(
@@ -623,12 +629,14 @@ export class AppService {
         `${bookType === 'docx' ? bookPathWord : bookPathEpub}`,
       ),
       bookName: bookName,
+      book: book,
     };
   }
 
   async generateEpub(bookInfo): Promise<any> {
     let fullDesc = '';
-    if (bookInfo.fullDescription.length > 0) {
+    const newEpubChapter = JSON.parse(JSON.stringify(bookInfo.chapters));
+    if (bookInfo.fullDescription?.length > 0) {
       for (const desc of bookInfo.fullDescription) {
         fullDesc += '<p>' + desc.text.trim() + '</p>';
       }
@@ -637,7 +645,7 @@ export class AppService {
         title: 'รายละเอียด',
         data: fullDesc,
       };
-      bookInfo.chapters.unshift(briefDescription);
+      newEpubChapter.unshift(briefDescription);
     }
 
     const customCss = `
@@ -666,7 +674,7 @@ export class AppService {
       author: bookInfo.author,
       publisher: bookInfo.author,
       cover: bookInfo.coverImage,
-      content: bookInfo.chapters,
+      content: newEpubChapter,
       lang: 'th',
       fonts: [path.join(__dirname, '../../fonts/THSarabunNew.ttf')],
       css: customCss,
@@ -760,7 +768,7 @@ export class AppService {
     let briefDescriptionSection = {};
 
     // Construct Brief Description
-    if (bookInfo.fullDescription.length > 0) {
+    if (bookInfo.fullDescription?.length > 0) {
       const paragraphs = [];
       paragraphs.push(
         new docx.Paragraph({
@@ -867,7 +875,8 @@ export class AppService {
 
     sections.push(coverSection);
     sections.push(tocSection);
-    sections.push(briefDescriptionSection);
+    if (bookInfo.fullDescription?.length > 0)
+      sections.push(briefDescriptionSection);
 
     for (const content of contentSection) {
       sections.push(content);

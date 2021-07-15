@@ -1,6 +1,6 @@
 {
   "name": "fictionlog-downloader",
-  "version": "0.4",
+  "version": "0.5",
   "description": "A simple tool to download purchased novel from fictionlog",
   "author": "AlienHack",
   "private": true,

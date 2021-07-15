@@ -6,6 +6,7 @@ import * as epub from 'epub-gen';
 import * as docx from 'docx';
 import * as officegen from 'officegen';
 import * as _ from 'lodash';
+import * as util from 'util';
 import { version } from '../package.json';
 import {
   getBookDetailQuery,
@@ -756,7 +757,7 @@ export class AppService {
       ],
     };
 
-    let briefDescriptionSection;
+    let briefDescriptionSection = {};
 
     // Construct Brief Description
     if (bookInfo.fullDescription.length > 0) {
@@ -809,7 +810,7 @@ export class AppService {
       };
     }
 
-    let contentSection;
+    const contentSection = [];
 
     // Construct Contents
     for (const chapter of bookInfo.chapters) {
@@ -842,7 +843,7 @@ export class AppService {
           }),
         );
       }
-      contentSection = {
+      const content = {
         properties: {
           type: docx.SectionType.NEXT_PAGE,
           page: {
@@ -860,12 +861,17 @@ export class AppService {
         },
         children: paragraphs,
       };
+
+      contentSection.push(content);
     }
 
     sections.push(coverSection);
     sections.push(tocSection);
     sections.push(briefDescriptionSection);
-    sections.push(contentSection);
+
+    for (const content of contentSection) {
+      sections.push(content);
+    }
 
     const doc = new docx.Document({
       creator: 'Created By Fictionlog Downloader v' + version,

@@ -56,6 +56,13 @@ export class AppService {
       .filter((path) => fs.statSync(path).isDirectory());
   }
 
+  getTokens(srcPath) {
+    return fs
+      .readdirSync(srcPath)
+      .map((file) => path.join(srcPath, file))
+      .filter((path) => fs.statSync(path).isFile() && path.includes('.text'));
+  }
+
   getMissingChapters(allChapters, chapters, path) {
     const chaptersOrder = chapters.map(({ order }) => order);
     const missingChapters = [];
@@ -98,13 +105,17 @@ export class AppService {
             book.title
           }`,
         );
-        const bookData = await this.downloadBook(
-          book._id,
-          token,
-          'docx',
-          false,
-        );
-        book = bookData.book;
+        try {
+          const bookData = await this.downloadBook(
+            book._id,
+            token,
+            'docx',
+            false,
+          );
+          book = bookData.book;
+        } catch (err) {
+          this.logger.warn('The book is invalid or discontinued');
+        }
 
         errorBookId = book._id;
         const outputDirectory = path.join(
@@ -395,6 +406,34 @@ export class AppService {
     return { status: 'success' };
   }
 
+  async clearTokens() {
+    const tokenDirectory = path.join(__dirname, '../../tokens/');
+    const tokenFiles = this.getTokens(tokenDirectory);
+    const tokenConfig = 'TOKEN=';
+    const coinConfig = 'GOLDCOIN=';
+    for (const tFile of tokenFiles) {
+      const fileContent = fs
+        .readFileSync(tFile, { encoding: 'utf8' })
+        .replace(/\r|\n/g, '|');
+
+      const token = fileContent.substring(
+        fileContent.indexOf(tokenConfig) + tokenConfig.length,
+      );
+
+      const authResult = await this.isAuthenticated(token);
+
+      // const moneyResult = fileContent.substring(
+      //   fileContent.indexOf(coinConfig) + coinConfig.length,
+      //   fileContent.indexOf('TEL=') - 1,
+      // );
+
+      if (!authResult) {
+        fs.unlinkSync(tFile);
+      }
+    }
+    return { status: 'success' };
+  }
+
   async purchaseAllChaptersToLibrary(bookId: string, token: string) {
     if (!token)
       throw new HttpException('token is required', HttpStatus.BAD_REQUEST);
@@ -612,12 +651,14 @@ export class AppService {
     }`;
 
     if (isGen) {
-      this.logger.verbose(`Generating ${bookName}`);
+      this.logger.verbose(`Generating... ${bookName}`);
       if (bookType === 'docx') {
         await this.generateWord(book);
       } else {
         await this.generateEpub(book);
       }
+    } else {
+      this.logger.verbose(`Downloading... ${bookName}`);
     }
 
     if (fs.existsSync(bookProject)) {

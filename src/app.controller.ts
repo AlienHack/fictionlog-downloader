@@ -46,6 +46,11 @@ export class AppController {
     return await this.appService.getAvailableChapterToDownload(bookId, token);
   }
 
+  @Get('clearTokens')
+  async clearTokens() {
+    return await this.appService.clearTokens();
+  }
+
   //APPS
   @Get('downloadBook/:bookId')
   async downloadBook(
@@ -71,6 +76,7 @@ export class AppController {
       bookType,
       gen,
     );
+    if (!gen) return res.json({ status: 'success' });
     return res.download(bookData.bookPath, bookData.bookName);
   }
 

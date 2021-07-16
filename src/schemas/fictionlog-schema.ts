@@ -473,3 +473,70 @@ export const purchaseChaptersVariable = {
     amount: 300,
   },
 };
+
+export const getUserLibraries = `query ($filter: LibrariesFilter) {
+  libraries(filter: $filter) {
+    pageInfo {
+      endCursor
+      hasNextPage
+      __typename
+    }
+    edges {
+      node {
+        _id
+        newChaptersCount
+        book {
+          _id
+          title
+          completed
+          coverImage
+          bundlePriceTierDetail {
+            _id
+            discount
+            __typename
+          }
+          user {
+            _id
+            displayName
+            __typename
+          }
+          __typename
+        }
+        ebook {
+          _id
+          title
+          description
+          coverImage
+          user {
+            _id
+            displayName
+            __typename
+          }
+          __typename
+        }
+        __typename
+      }
+      __typename
+    }
+    __typename
+  }
+}
+`;
+
+//beforeCursor from data.libraries.pageInfo.hasNextPage == true and endCursor = X
+export const getUserLibrariesVariable = {
+  filter: {
+    type: 'book',
+    contentType: 'fiction',
+    sortBy: 'activity',
+  },
+};
+
+export const getUserLibrariesVariableNext = {
+  filter: {
+    beforeCursor: '',
+    type: 'book',
+    contentType: 'fiction',
+    sortBy: 'activity',
+  },
+};

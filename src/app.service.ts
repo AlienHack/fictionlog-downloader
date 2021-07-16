@@ -17,6 +17,9 @@ import {
   getChapterListVariable,
   getUserDetailQuery,
   getUserDetailVariable,
+  getUserLibraries,
+  getUserLibrariesVariable,
+  getUserLibrariesVariableNext,
   purchaseChapter,
   purchaseChaptersVariable,
   requestUrl,
@@ -406,6 +409,107 @@ export class AppService {
     return { status: 'success' };
   }
 
+  async getAllBooksInLibraries(token: string) {
+    if (!token) return '';
+    const query = getUserLibraries;
+    const variables = getUserLibrariesVariable;
+    const { body } = await got.post(requestUrl, {
+      body: JSON.stringify({
+        query: query,
+        variables: variables,
+      }),
+      headers: {
+        authorization: `JWT ${token}`,
+        'Content-Type': 'application/json',
+      },
+      retry: {
+        limit: 3,
+        methods: ['GET', 'POST'],
+      },
+    });
+    let librariesResponse = JSON.parse(body);
+    if (
+      !librariesResponse.data?.libraries ||
+      librariesResponse.data.libraries.edges.length == 0
+    )
+      return [];
+
+    const bookId = [];
+    for (const bookData of librariesResponse.data.libraries.edges) {
+      bookId.push(bookData.node.book._id);
+    }
+
+    while (librariesResponse.data.libraries.pageInfo.hasNextPage == true) {
+      const v = {
+        ...getUserLibrariesVariableNext,
+      };
+      v.filter.beforeCursor =
+        librariesResponse.data.libraries.pageInfo.endCursor;
+      const b = (
+        await got.post(requestUrl, {
+          body: JSON.stringify({
+            query: query,
+            variables: v,
+          }),
+          headers: {
+            authorization: `JWT ${token}`,
+            'Content-Type': 'application/json',
+          },
+          retry: {
+            limit: 3,
+            methods: ['GET', 'POST'],
+          },
+        })
+      ).body;
+      librariesResponse = JSON.parse(b);
+      for (const bookData of librariesResponse.data.libraries.edges) {
+        bookId.push(bookData.node.book._id);
+      }
+    }
+
+    return bookId;
+  }
+
+  async refreshLibrariesAllToken() {
+    const tokenDirectory = path.join(__dirname, '../../tokens/');
+    const tokenFiles = this.getTokens(tokenDirectory);
+    const tokenConfig = 'TOKEN=';
+
+    this.logger.verbose(
+      'Begin refreshing libraries for ' + tokenFiles.length + ' tokens',
+    );
+    let tokenIndex = 1;
+    for (const tFile of tokenFiles) {
+      const fileContent = fs
+        .readFileSync(tFile, { encoding: 'utf8' })
+        .replace(/\r|\n/g, '|');
+
+      const token = fileContent.substring(
+        fileContent.indexOf(tokenConfig) + tokenConfig.length,
+      );
+
+      const authResult = await this.isAuthenticated(token);
+
+      if (!authResult) {
+        continue;
+      }
+
+      //Get All Book
+      const bookIds = await this.getAllBooksInLibraries(token);
+      let bookIndex = 1;
+      for (const bookId of bookIds) {
+        this.logger.verbose(
+          `[ ${tokenIndex} of ${
+            tokenFiles.length
+          } ] Processing book ${bookIndex++} of ${bookIds.length}`,
+        );
+        await this.downloadBook(bookId, token, 'docx', false);
+      }
+      ++tokenIndex;
+    }
+    return { status: 'success' };
+  }
+
   async clearTokens() {
     const tokenDirectory = path.join(__dirname, '../../tokens/');
     const tokenFiles = this.getTokens(tokenDirectory);
@@ -554,7 +658,9 @@ export class AppService {
     }
 
     const bookInfo = await this.getBookDetail(bookId, token);
-
+    if (!isGen) {
+      this.logger.verbose('Scraping... ' + bookInfo.title);
+    }
     const novelDirectory = path.join(
       downloadDirectory,
       this.cleanTitle(bookInfo.title),
@@ -657,8 +763,6 @@ export class AppService {
       } else {
         await this.generateEpub(book);
       }
-    } else {
-      this.logger.verbose(`Downloading... ${bookName}`);
     }
 
     if (fs.existsSync(bookProject)) {

@@ -51,6 +51,11 @@ export class AppController {
     return await this.appService.clearTokens();
   }
 
+  @Get('regenerateLibraries')
+  async refreshLibrariesAllToken() {
+    return await this.appService.refreshLibrariesAllToken();
+  }
+
   //APPS
   @Get('downloadBook/:bookId')
   async downloadBook(

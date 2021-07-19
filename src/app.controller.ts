@@ -1,4 +1,4 @@
-import { Res } from '@nestjs/common';
+import { HttpException, HttpStatus, Res } from '@nestjs/common';
 import { Controller, Get, Param, Query } from '@nestjs/common';
 import { AppService } from './app.service';
 import { Response } from 'express';
@@ -82,6 +82,11 @@ export class AppController {
       gen,
     );
     if (!gen) return res.json({ status: 'success' });
+    if (!bookData.success)
+      throw new HttpException(
+        'Invalid book ID or Authentication Error',
+        HttpStatus.BAD_REQUEST,
+      );
     return res.download(bookData.bookPath, bookData.bookName);
   }
 

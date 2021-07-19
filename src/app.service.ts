@@ -94,103 +94,112 @@ export class AppService {
     await fs.promises.mkdir(booksDirectory, { recursive: true });
     let errorBookId = '';
     let workCount = 1;
-    for (const novelDirectory of novelDirectories) {
-      try {
-        const projectDirectory = path.join(novelDirectory, '/project/');
-        const projectFile = path.join(
-          projectDirectory,
-          fs.readdirSync(projectDirectory)[0],
-        );
 
-        let book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
-        this.logger.verbose(
-          `[ ${workCount++} of ${novelDirectories.length}] Processing... ${
-            book.title
-          }`,
-        );
-        try {
-          const bookData = await this.downloadBook(
-            book._id,
-            token,
-            'docx',
-            false,
-          );
-          book = bookData.book;
-        } catch (err) {
-          this.logger.warn('The book is invalid or discontinued');
-        }
+    while (novelDirectories.length) {
+      await Promise.allSettled(
+        novelDirectories.splice(0, 5).map(async (novelDirectory) => {
+          try {
+            const projectDirectory = path.join(novelDirectory, '/project/');
+            const projectFile = path.join(
+              projectDirectory,
+              fs.readdirSync(projectDirectory)[0],
+            );
 
-        errorBookId = book._id;
-        const outputDirectory = path.join(
-          booksDirectory,
-          this.cleanTitle(book.title),
-          '/',
-        );
-        await fs.promises.mkdir(outputDirectory, { recursive: true });
-
-        const allChaptersList = await this.getChapterList(book._id, token);
-
-        this.getMissingChapters(
-          allChaptersList,
-          book.chapters,
-          outputDirectory + 'missingChapters.txt',
-        );
-
-        const chapterContent = book.chapters;
-        const totalChapter = book.chapters.length;
-        let chapterFrom = 1;
-        let chapterTo = 100;
-        if (chapterTo > totalChapter) {
-          chapterTo = totalChapter;
-        }
-        while (chapterTo <= totalChapter) {
-          const fileNameEpub = path.join(
-            outputDirectory,
-            this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.epub`,
-          );
-
-          const fileNameWord = path.join(
-            outputDirectory,
-            this.cleanTitle(book.title) + ` ${chapterFrom}-${chapterTo}.docx`,
-          );
-
-          book.chapters = chapterContent.filter(
-            (c) => c.order >= chapterFrom && c.order <= chapterTo,
-          );
-
-          if (!fs.existsSync(fileNameEpub)) {
+            let book = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+            this.logger.verbose(
+              `[ Current Work: ${workCount++} | Left: ${
+                novelDirectories.length
+              } ] Processing... ${book.title}`,
+            );
             try {
-              await this.generateEpubByPage(book, fileNameEpub);
+              const bookData = await this.downloadBook(
+                book._id,
+                token,
+                'docx',
+                false,
+              );
+              book = bookData.book;
             } catch (err) {
-              this.logger.error(err);
+              this.logger.warn('The book is invalid or discontinued');
             }
-          }
 
-          if (!fs.existsSync(fileNameWord)) {
-            try {
-              await this.generateWordByPage(book, fileNameWord);
-            } catch (err) {
-              this.logger.error(err);
+            errorBookId = book._id;
+            const outputDirectory = path.join(
+              booksDirectory,
+              this.cleanTitle(book.title),
+              '/',
+            );
+            await fs.promises.mkdir(outputDirectory, { recursive: true });
+
+            const allChaptersList = await this.getChapterList(book._id, token);
+
+            this.getMissingChapters(
+              allChaptersList,
+              book.chapters,
+              outputDirectory + 'missingChapters.txt',
+            );
+
+            const chapterContent = book.chapters;
+            const totalChapter = book.chapters.length;
+            let chapterFrom = 1;
+            let chapterTo = 100;
+            if (chapterTo > totalChapter) {
+              chapterTo = totalChapter;
             }
-          }
+            while (chapterTo <= totalChapter) {
+              const fileNameEpub = path.join(
+                outputDirectory,
+                this.cleanTitle(book.title) +
+                  ` ${chapterFrom}-${chapterTo}.epub`,
+              );
 
-          chapterFrom = chapterTo + 1;
-          chapterTo = chapterTo + 100;
+              const fileNameWord = path.join(
+                outputDirectory,
+                this.cleanTitle(book.title) +
+                  ` ${chapterFrom}-${chapterTo}.docx`,
+              );
 
-          if (chapterFrom > totalChapter) {
-            break;
-          }
+              book.chapters = chapterContent.filter(
+                (c) => c.order >= chapterFrom && c.order <= chapterTo,
+              );
 
-          if (chapterTo > totalChapter) {
-            chapterTo = totalChapter;
+              if (!fs.existsSync(fileNameEpub)) {
+                try {
+                  await this.generateEpubByPage(book, fileNameEpub);
+                } catch (err) {
+                  this.logger.error(err);
+                }
+              }
+
+              if (!fs.existsSync(fileNameWord)) {
+                try {
+                  await this.generateWordByPage(book, fileNameWord);
+                } catch (err) {
+                  this.logger.error(err);
+                }
+              }
+
+              chapterFrom = chapterTo + 1;
+              chapterTo = chapterTo + 100;
+
+              if (chapterFrom > totalChapter) {
+                break;
+              }
+
+              if (chapterTo > totalChapter) {
+                chapterTo = totalChapter;
+              }
+            }
+          } catch (err) {
+            this.logger.error(
+              'Error: Something went wrong in ' +
+                novelDirectory +
+                ' repairing... ',
+            );
+            await this.downloadBook(errorBookId, token, 'docx', false);
           }
-        }
-      } catch (err) {
-        this.logger.error(
-          'Error: Something went wrong in ' + novelDirectory + ' repairing... ',
-        );
-        await this.downloadBook(errorBookId, token, 'docx', false);
-      }
+        }),
+      );
     }
     return { status: 'success' };
   }
@@ -410,7 +419,7 @@ export class AppService {
   }
 
   async getAllBooksInLibraries(token: string) {
-    if (!token) return '';
+    if (!token) return [];
     const query = getUserLibraries;
     const variables = getUserLibrariesVariable;
     const { body } = await got.post(requestUrl, {
@@ -497,6 +506,7 @@ export class AppService {
       //Get All Book
       const bookIds = await this.getAllBooksInLibraries(token);
       let bookIndex = 1;
+
       for (const bookId of bookIds) {
         this.logger.verbose(
           `[ ${tokenIndex} of ${
@@ -505,6 +515,14 @@ export class AppService {
         );
         await this.downloadBook(bookId, token, 'docx', false);
       }
+      // for (const bookId of bookIds) {
+      //   this.logger.verbose(
+      //     `[ ${tokenIndex} of ${
+      //       tokenFiles.length
+      //     } ] Processing book ${bookIndex++} of ${bookIds.length}`,
+      //   );
+      //   await this.downloadBook(bookId, token, 'docx', false);
+      // }
       ++tokenIndex;
     }
     return { status: 'success' };
@@ -656,8 +674,20 @@ export class AppService {
         HttpStatus.FORBIDDEN,
       );
     }
+    let bookInfo;
+    try {
+      bookInfo = await this.getBookDetail(bookId, token);
+    } catch (err) {
+      this.logger.error(err);
+    }
 
-    const bookInfo = await this.getBookDetail(bookId, token);
+    if (!bookInfo) {
+      return {
+        success: false,
+        detail: `Error: Invalid book id`,
+      };
+    }
+
     if (!isGen) {
       this.logger.verbose('Scraping... ' + bookInfo.title);
     }
@@ -697,45 +727,58 @@ export class AppService {
       (chapter) => !chapter.isPurchaseRequired,
     );
 
-    for (const chapter of chaptersList) {
-      const chapterFile = `${novelDirectory}${this.zero_padding(
-        chapter.order,
-        5,
-      )}_${chapter._id}.txt`;
-      const rawFile = `${rawDirectory}${this.zero_padding(chapter.order, 5)}_${
-        chapter._id
-      }.txt`;
+    const chapterWorker = JSON.parse(JSON.stringify(chaptersList));
 
-      if (fs.existsSync(rawFile)) {
-        const rawCh = JSON.parse(fs.readFileSync(rawFile, 'utf8'));
-        chapters.push(rawCh);
-        continue;
-      }
+    while (chapterWorker.length) {
+      await Promise.allSettled(
+        chapterWorker.splice(0, 25).map(async (chapter) => {
+          const chapterFile = `${novelDirectory}${this.zero_padding(
+            chapter.order,
+            5,
+          )}_${chapter._id}.txt`;
+          const rawFile = `${rawDirectory}${this.zero_padding(
+            chapter.order,
+            5,
+          )}_${chapter._id}.txt`;
 
-      const chapterDetail = await this.getChapterDetail(chapter._id, token);
-      const chapterBlocks = chapterDetail.contentRawState.blocks
-        .map(({ text, type }) => ({
-          text,
-          type,
-        }))
-        .filter(({ text }) => text.length >= 2);
-      let chapterRaw = '';
-      for (const block of chapterBlocks) {
-        chapterRaw += `<p>${block.text.trim()}</p>`;
-      }
+          if (fs.existsSync(rawFile)) {
+            const rawCh = JSON.parse(fs.readFileSync(rawFile, 'utf8'));
+            chapters.push(rawCh);
+            return;
+          }
 
-      const chapterData = {
-        _id: chapter._id,
-        order: chapter.order,
-        title: chapterDetail.title,
-        data: chapterRaw,
-        blocks: chapterBlocks,
-      };
+          const chapterDetail = await this.getChapterDetail(chapter._id, token);
+          let chapterBlocks;
+          try {
+            chapterBlocks = chapterDetail.contentRawState.blocks
+              .map(({ text, type }) => ({
+                text,
+                type,
+              }))
+              .filter(({ text }) => text.length >= 2);
+          } catch (err) {
+            return;
+          }
 
-      fs.writeFileSync(chapterFile, chapterRaw);
-      fs.writeFileSync(rawFile, JSON.stringify(chapterData));
+          let chapterRaw = '';
+          for (const block of chapterBlocks) {
+            chapterRaw += `<p>${block.text.trim()}</p>`;
+          }
 
-      chapters.push(chapterData);
+          const chapterData = {
+            _id: chapter._id,
+            order: chapter.order,
+            title: chapterDetail.title,
+            data: chapterRaw,
+            blocks: chapterBlocks,
+          };
+
+          fs.writeFileSync(chapterFile, chapterRaw);
+          fs.writeFileSync(rawFile, JSON.stringify(chapterData));
+
+          chapters.push(chapterData);
+        }),
+      );
     }
 
     const book = {
@@ -743,7 +786,7 @@ export class AppService {
       title: bookInfo.title,
       coverImage: bookInfo.coverImage,
       description: bookInfo.description,
-      fullDescription: bookInfo.contentRawState.blocks,
+      fullDescription: bookInfo.contentRawState?.blocks || '',
       hashtags: bookInfo.hashtags,
       author: bookInfo.authorName || bookInfo.user.displayName,
       translator: bookInfo.translatorName || bookInfo.user.displayName,
@@ -755,6 +798,8 @@ export class AppService {
     const bookName = `${bookInfo.title}.${
       bookType === 'docx' ? 'docx' : 'epub'
     }`;
+
+    book.chapters = _.sortBy(book.chapters, 'order');
 
     if (isGen) {
       this.logger.verbose(`Generating... ${bookName}`);

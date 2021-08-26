@@ -986,7 +986,7 @@ export class AppService {
             children: [
               new docx.TextRun({
                 text: '\t' + desc.text.trim(),
-                size: 40,
+                size: 50,
                 font: 'TH Sarabun New',
               }),
             ],
@@ -1039,7 +1039,7 @@ export class AppService {
             children: [
               new docx.TextRun({
                 text: '\t' + paragraph.text.trim(),
-                size: 40,
+                size: 50,
                 font: 'TH Sarabun New',
               }),
             ],
@@ -1113,7 +1113,7 @@ export class AppService {
             run: {
               font: 'TH Sarabun New',
               color: '#000000',
-              size: 40,
+              size: 50,
             },
           },
         ],
